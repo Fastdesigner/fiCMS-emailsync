@@ -108,6 +108,7 @@ final class JobStore {
 		});
 		\ficms\Files::removeDirectory(State::path('runs/'.$id),true,true);
 		ProgressStore::delete($id);
+		Statistics::delete($id);
 		foreach (['source_id','destination_id'] as $field) if (!empty($job[$field]) && !self::connectionInUse((string) $job[$field])) \imap\ConnectionStore::delete((string) $job[$field]);
 		return true;
 	}

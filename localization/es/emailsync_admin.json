@@ -74,7 +74,11 @@
   "_emailsync_statistics_completed": "Finalizadas",
   "_emailsync_statistics_failed": "Última ejecución fallida",
   "_emailsync_statistics_runs": "Ejecuciones cron",
+  "_emailsync_statistics_progress": "Correos sincronizados en total",
   "_emailsync_statistics_messages_transferred": "Mensajes transferidos en total",
+  "_emailsync_statistics_messages_discovered": "Mensajes nuevos de origen en total",
+  "_emailsync_statistics_messages_skipped": "Mensajes omitidos en total",
+  "_emailsync_statistics_errors": "Errores en total",
   "_emailsync_statistics_bytes_transferred": "Datos transferidos en total",
   "_emailsync_statistics_last_run": "Última ejecución",
   "_emailsync_statistics_never": "Sin ejecuciones"

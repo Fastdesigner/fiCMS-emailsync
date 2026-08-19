@@ -57,6 +57,7 @@ final class MailboxSync {
 
 		try {
 			if ($id === '') throw new RuntimeException('job_invalid');
+			ProgressStore::start($id);
 			$clients = [new \imap\Client($source),new \imap\Client($destination)];
 			foreach ($clients as $client) $client->connect();
 			self::transfer($id,$clients[0],$clients[1],$result['stats']);
@@ -67,6 +68,7 @@ final class MailboxSync {
 			$result['stats']['errors'] = 1;
 		} finally {
 			foreach (array_reverse($clients) as $client) $client->close();
+			if ($id !== '') ProgressStore::finish($id,!empty($result['success']));
 		}
 
 		$result['finished'] = time();
@@ -85,26 +87,40 @@ final class MailboxSync {
 		$destinationDelimiter = (string) ($destinationFolders[0]['delimiter'] ?? '/');
 		usort($sourceFolders,fn(array $first, array $second): int => [strcasecmp((string) $first['name'],'INBOX') !== 0,(string) $first['name']] <=> [strcasecmp((string) $second['name'],'INBOX') !== 0,(string) $second['name']]);
 
+		$plan = [];
+		$total = 0;
 		foreach ($sourceFolders as $folder) {
 			$sourceName = (string) $folder['name'];
 			$destinationName = self::destinationName($sourceName,(string) ($folder['delimiter'] ?? '/'),$destinationDelimiter);
-			$destinationKey = strtolower($destinationName);
-			if (!isset($destinationNames[$destinationKey])) {
-				$destination->create($destinationName);
-				$destinationNames[$destinationKey] = $destinationName;
-			}
-
 			$sourceStatus = $source->select($sourceName,true);
 			$stored = ProgressStore::folder($progress,$sourceName);
 			if (!empty($stored['uidvalidity']) && (int) $stored['uidvalidity'] !== $sourceStatus['uidvalidity']) throw new RuntimeException('source_uidvalidity_changed');
 			$lastUid = (int) ($stored['last_uid'] ?? 0);
 			$uids = $source->uidsAfter($lastUid);
 			$stats['messages_source'] += (int) $sourceStatus['exists'];
+			$total += count($uids);
+			$plan[] = ['source'=>$sourceName,'destination'=>$destinationName,'status'=>$sourceStatus,'stored'=>$stored,'uids'=>$uids];
+		}
+		ProgressStore::plan($jobId,$total);
+
+		$processed = 0;
+		foreach ($plan as $folder) {
+			$sourceName = $folder['source'];
+			$destinationName = $folder['destination'];
+			$destinationKey = strtolower($destinationName);
+			if (!isset($destinationNames[$destinationKey])) {
+				$destination->create($destinationName);
+				$destinationNames[$destinationKey] = $destinationName;
+			}
+			$source->select($sourceName,true);
+			$sourceStatus = $folder['status'];
+			$stored = $folder['stored'];
+			$uids = $folder['uids'];
 			$destinationStatus = $destination->select($destinationNames[$destinationKey]);
 			$stats['messages_destination'] += (int) $destinationStatus['exists'];
 
 			if (!$stored) {
-				$progress = ProgressStore::checkpoint($jobId,$sourceName,(int) $sourceStatus['uidvalidity'],0);
+				$progress = ProgressStore::checkpoint($jobId,$sourceName,(int) $sourceStatus['uidvalidity'],0,0,$processed);
 				$stored = ProgressStore::folder($progress,$sourceName);
 			}
 
@@ -127,7 +143,8 @@ final class MailboxSync {
 				} finally {
 					fclose($message['stream']);
 				}
-				$progress = ProgressStore::checkpoint($jobId,$sourceName,(int) $sourceStatus['uidvalidity'],$uid,$destinationUid);
+				$processed++;
+				$progress = ProgressStore::checkpoint($jobId,$sourceName,(int) $sourceStatus['uidvalidity'],$uid,$destinationUid,$processed);
 			}
 			$destination->subscribe($destinationNames[$destinationKey]);
 		}

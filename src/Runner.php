@@ -27,6 +27,7 @@ final class Runner {
 		$destination = \imap\ConnectionStore::credentials((string) ($job['destination_id'] ?? ''));
 		$result = MailboxSync::run($job,$source,$destination);
 		$finished = (int) ($result['finished'] ?? time());
+		Statistics::add($id,$result);
 
 		if (empty($result['success'])) {
 			$firstFailure = (int) ($job['failure_count'] ?? 0) === 0;
