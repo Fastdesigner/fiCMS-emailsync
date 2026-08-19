@@ -39,6 +39,9 @@ foreach ($reports['recipients'] as $reports['emailsync_email'] => $reports['emai
 		if ((int) ($reports['emailsync_event']['report_user_id'] ?? 0) !== (int) ($reports['emailsync_recipient']['user']['id'] ?? 0) && strcasecmp((string) ($reports['emailsync_event']['report_email'] ?? ''),(string) $reports['emailsync_email']) !== 0) continue;
 		$reports['emailsync_summary'] = (array) ($reports['emailsync_event']['summary'] ?? []);
 		$reports['emailsync_stats'] = (array) ($reports['emailsync_summary']['stats'] ?? []);
+		$reports['emailsync_progress'] = (array) ($reports['emailsync_summary']['progress'] ?? []);
+		if (!$reports['emailsync_progress'] && !empty($reports['emailsync_event']['job_id'])) $reports['emailsync_progress'] = \emailsync\ProgressStore::summary(\emailsync\JobStore::get((string) $reports['emailsync_event']['job_id']));
+		$reports['emailsync_progress_percent'] = (int) ($reports['emailsync_progress']['total'] ?? 0) > 0 ? min(100,(int) round(((int) ($reports['emailsync_progress']['processed'] ?? 0) / (int) $reports['emailsync_progress']['total']) * 100)) : (!empty($reports['emailsync_summary']['success']) ? 100 : 0);
 		$reports['emailsync_list'][] = ['feature'=>'lead','data'=>[
 			'titlekey'=>'',
 			'title'=>htmlspecialchars((string) ($reports['emailsync_event']['name'] ?? ''),ENT_QUOTES,'UTF-8'),
@@ -54,15 +57,15 @@ foreach ($reports['recipients'] as $reports['emailsync_email'] => $reports['emai
 			'titlekey'=>'_emailsync_run_summary',
 			'title'=>'',
 			'desckey'=>'',
-			'value'=>(string) ($reports['emailsync_stats']['messages_transferred'] ?? 0),
+			'value'=>$reports['emailsync_progress_percent'].' %',
 			'color'=>'',
-			'labelkey'=>'_emailsync_messages_transferred',
+			'labelkey'=>'_emailsync_statistics_messages_processed',
 			'delta'=>'',
 			'metric'=>reports__metrics([
-				['key'=>'messages_discovered','label'=>'_emailsync_messages_discovered','value'=>(int) ($reports['emailsync_stats']['messages_discovered'] ?? 0)],
-				['key'=>'messages_skipped','label'=>'_emailsync_messages_skipped','value'=>(int) ($reports['emailsync_stats']['messages_skipped'] ?? 0)],
-				['key'=>'duration','label'=>'_emailsync_duration_seconds','value'=>(int) ($reports['emailsync_summary']['duration'] ?? 0)],
-				['key'=>'exit_code','label'=>'_emailsync_exit_code','value'=>(int) ($reports['emailsync_summary']['exit_code'] ?? -1)]
+				['key'=>'messages_total','label'=>'_emailsync_statistics_messages_total','value'=>(int) ($reports['emailsync_progress']['total'] ?? 0)],
+				['key'=>'messages_processed','label'=>'_emailsync_statistics_messages_processed','value'=>(int) ($reports['emailsync_progress']['processed'] ?? 0)],
+				['key'=>'messages_pending','label'=>'_emailsync_statistics_messages_pending','value'=>(int) ($reports['emailsync_progress']['pending'] ?? 0)],
+				['key'=>'messages_transferred','label'=>'_emailsync_messages_transferred','value'=>(int) ($reports['emailsync_stats']['messages_transferred'] ?? 0)]
 			])
 		]];
 		$reports['emailsync_sent'][$reports['emailsync_event']['id']] = true;

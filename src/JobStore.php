@@ -115,6 +115,7 @@ final class JobStore {
 	public static function event(string $jobId, string $type, array $summary = []): array {
 		$job = self::get($jobId);
 		if (!$job || !in_array($type,['initial_complete','completed','failed'],true)) return [];
+		$summary['progress'] = ProgressStore::summary($job);
 		$event = [
 			'id'=>'event-'.bin2hex(random_bytes(8)),
 			'job_id'=>$jobId,
