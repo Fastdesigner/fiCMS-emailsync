@@ -24,9 +24,9 @@ final class Statistics {
 			'bytes_transferred'=>max(0,(int) ($stats['bytes_transferred'] ?? 0)),
 			'errors'=>max(0,(int) ($stats['errors'] ?? 0))
 		];
-		$hour = (int) (floor(max(1,(int) ($result['finished'] ?? time())) / 3600) * 3600);
+		$timestamp = max(1,(int) ($result['finished'] ?? time()));
 		$written = true;
-		foreach ($values as $key => $amount) if (!statistics__daily_json_increment(self::file($jobId),$key,self::DEFAULTS,$hour,$amount)) $written = false;
+		foreach ($values as $key => $amount) if (!statistics__daily_json_increment(self::file($jobId),$key,self::DEFAULTS,$timestamp,$amount)) $written = false;
 		return $written;
 	}
 
@@ -62,22 +62,19 @@ final class Statistics {
 			$increments[$timestamp] = (int) ($increments[$timestamp] ?? 0) + $recovered;
 		}
 		ksort($increments);
-		$maxPoints = max(2,$maxPoints);
-		$pointCount = min($maxPoints,max(2,(int) ceil(($end - $start) / 3600) + 1));
-		$points = [];
+		$points = [['time'=>$start,'value'=>0]];
 		$cumulative = 0;
-		$increment = 0;
-		$timestamps = array_keys($increments);
-		for ($index = 0; $index < $pointCount; $index++) {
-			$timestamp = (int) round($start + (($end - $start) * $index / ($pointCount - 1)));
-			while (isset($timestamps[$increment]) && $timestamps[$increment] <= $timestamp) {
-				$cumulative += (int) $increments[$timestamps[$increment]];
-				$increment++;
-			}
-			if ($index === $pointCount - 1) $cumulative = $total;
+		foreach ($increments as $timestamp => $amount) {
+			$cumulative += $amount;
 			$points[] = ['time'=>$timestamp,'value'=>$cumulative];
 		}
-		return $points;
+		if ((int) $points[array_key_last($points)]['time'] === $end) $points[array_key_last($points)]['value'] = $total;
+		else $points[] = ['time'=>$end,'value'=>$total];
+		$maxPoints = max(2,$maxPoints);
+		if (count($points) <= $maxPoints) return $points;
+		$sampled = [];
+		for ($index = 0; $index < $maxPoints; $index++) $sampled[] = $points[(int) round($index * (count($points) - 1) / ($maxPoints - 1))];
+		return $sampled;
 	}
 
 	private static function file(string $jobId): string {

@@ -204,8 +204,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			$emailsync['job_synchronized'] = max(0,(int) ($emailsync['job']['stats_total']['messages_synchronized'] ?? 0),(int) ($emailsync['job_progress']['run']['processed'] ?? 0));
 			$emailsync['job_graph']['series']['messages_synchronized']['value'] = $emailsync['job_synchronized'];
 			$emailsync['job_series'] = \emailsync\Statistics::series((string) $emailsync['job']['id'],$emailsync['job_synchronized'],max(0,(int) ($emailsync['job']['run_count'] ?? 0)),(int) ($emailsync['job']['created'] ?? 0),(int) ($_SERVER['now'] ?? time()));
-			$emailsync['job_formatter'] = IntlDateFormatter::create($user['language'],IntlDateFormatter::SHORT,IntlDateFormatter::SHORT);
-			foreach ($emailsync['job_series'] as $emailsync['point']) $emailsync['job_graph']['points'][] = ['label'=>$emailsync['job_formatter']->format((int) $emailsync['point']['time']),'data'=>['messages_synchronized'=>(int) $emailsync['point']['value']]];
+			foreach ($emailsync['job_series'] as $emailsync['point']) $emailsync['job_graph']['points'][] = ['label'=>format__date_relative((int) $emailsync['point']['time'],'relative',$user['language'],true),'data'=>['messages_synchronized'=>(int) $emailsync['point']['value']]];
 			$emailsync['job_statistic_items'] = [];
 			if (count($emailsync['job_graph']['points'])) $emailsync['job_statistic_items'][] = ['id'=>$settings['key'].'-'.$emailsync['job']['id'].'-graph','type'=>'statistics','chart'=>'graph','attributes'=>['data-span'=>'all','data-label'=>language__get($user['language'],'_emailsync_statistics_progress')],'values'=>statistics__format_graph($user['language'],$emailsync['job_graph'],['messages_synchronized'=>'_emailsync_statistics_messages_synchronized'],['gridLines'=>4,'legend'=>false,'smooth'=>false,'decimals'=>0])];
 			foreach (['messages_transferred','messages_discovered','messages_skipped','runs','errors'] as $emailsync['stat']) {
