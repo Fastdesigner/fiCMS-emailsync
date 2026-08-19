@@ -135,7 +135,6 @@ final class MailboxSync {
 			foreach ($uids as $uid) {
 				if ($sliceProcessed > 0 && !helper__system_load_check('emailsync_transfer',self::SLICE_SECONDS)) return false;
 				$stats['messages_discovered']++;
-				$stats['messages_synchronized']++;
 				$message = $source->fetch($uid);
 				try {
 					$hash = \imap\Client::hash($message['stream']);
@@ -156,6 +155,7 @@ final class MailboxSync {
 				$processed++;
 				$sliceProcessed++;
 				$progress = ProgressStore::checkpoint($jobId,$sourceName,(int) $sourceStatus['uidvalidity'],$uid,$destinationUid,$processed);
+				$stats['messages_synchronized']++;
 			}
 			$destination->subscribe($destinationNames[$destinationKey]);
 		}

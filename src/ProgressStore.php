@@ -70,13 +70,19 @@ final class ProgressStore {
 	}
 
 	public static function ratio(array $job): float {
+		$summary = self::summary($job);
 		if (($job['phase'] ?? '') === 'completed') return 1;
-		$run = (array) (self::get((string) ($job['id'] ?? ''))['run'] ?? []);
-		$total = max(0,(int) ($run['total'] ?? 0));
-		$processed = max(0,(int) ($run['processed'] ?? 0));
-		if ($total > 0) return min(1,$processed / $total);
-		if (($job['phase'] ?? '') === 'monitoring' || !empty($run['success'])) return 1;
+		if ($summary['total'] > 0) return min(1,$summary['processed'] / $summary['total']);
+		if (($job['phase'] ?? '') === 'monitoring' || !empty($summary['success'])) return 1;
 		return 0;
+	}
+
+	public static function summary(array $job): array {
+		$run = (array) (self::get((string) ($job['id'] ?? ''))['run'] ?? []);
+		$processed = max(0,(int) ($run['processed'] ?? 0),(int) ($job['stats_total']['messages_synchronized'] ?? 0));
+		$total = max($processed,(int) ($run['total'] ?? 0),(int) ($job['last_summary']['stats']['messages_source'] ?? 0));
+		$historic = max(0,$processed - (int) ($job['stats_total']['messages_transferred'] ?? 0) - (int) ($job['stats_total']['messages_skipped'] ?? 0));
+		return ['total'=>$total,'processed'=>$processed,'pending'=>max(0,$total - $processed),'historic'=>$historic,'success'=>(int) ($run['success'] ?? 0)];
 	}
 
 	public static function delete(string $jobId): bool {

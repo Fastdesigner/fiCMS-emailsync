@@ -35,6 +35,7 @@ final class McpView {
 			'run_count'=>(int) ($job['run_count'] ?? 0),
 			'failure_count'=>(int) ($job['failure_count'] ?? 0),
 			'progress'=>ProgressStore::ratio($job),
+			'progress_summary'=>ProgressStore::summary($job),
 			'stats_total'=>(array) ($job['stats_total'] ?? [])
 		];
 		if (!$details) return $view;
