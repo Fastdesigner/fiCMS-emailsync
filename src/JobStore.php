@@ -149,6 +149,22 @@ final class JobStore {
 		return $result !== false;
 	}
 
+	public static function statistics(): array {
+		$statistics = ['jobs'=>0,'active'=>0,'initial'=>0,'monitoring'=>0,'completed'=>0,'failed'=>0,'runs'=>0,'messages_transferred'=>0,'bytes_transferred'=>0,'last_run'=>0];
+		foreach (self::list() as $job) {
+			$statistics['jobs']++;
+			$phase = in_array(($job['phase'] ?? ''),['initial','monitoring','completed'],true) ? $job['phase'] : 'initial';
+			$statistics[$phase]++;
+			if ((int) ($job['active'] ?? 0) === 1 && $phase !== 'completed') $statistics['active']++;
+			if (($job['last_result'] ?? '') === 'failed') $statistics['failed']++;
+			$statistics['runs'] += max(0,(int) ($job['run_count'] ?? 0));
+			$statistics['messages_transferred'] += max(0,(int) ($job['stats_total']['messages_transferred'] ?? 0));
+			$statistics['bytes_transferred'] += max(0,(int) ($job['stats_total']['bytes_transferred'] ?? 0));
+			$statistics['last_run'] = max($statistics['last_run'],(int) ($job['last_run'] ?? 0));
+		}
+		return $statistics;
+	}
+
 	private static function normalize(array $data): array {
 		$phase = in_array(($data['phase'] ?? ''),['initial','monitoring','completed'],true) ? $data['phase'] : 'initial';
 		return [

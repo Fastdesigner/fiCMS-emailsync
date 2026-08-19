@@ -3,6 +3,18 @@
 namespace emailsync;
 
 final class DnsMonitor {
+	public static function resolveDomain(string $domain, array $usernames = []): string {
+		$domain = self::domain($domain);
+		if ($domain !== '') return $domain;
+		foreach ($usernames as $username) {
+			$username = trim((string) $username);
+			if (strpos($username,'@') === false) continue;
+			$domain = self::domain(substr($username,strrpos($username,'@') + 1));
+			if ($domain !== '') return $domain;
+		}
+		return '';
+	}
+
 	public static function snapshot(string $domain): array {
 		$domain = self::domain($domain);
 		if ($domain === '') return ['domain'=>'','records'=>[],'targets'=>[],'fingerprint'=>'','ttl'=>0,'checked'=>(int) ($_SERVER['now'] ?? time())];

@@ -15,6 +15,30 @@ final class MailboxSync {
 		];
 	}
 
+	public static function test(array $connection): array {
+		$client = null;
+		try {
+			$host = substr(strtolower(rtrim(trim((string) ($connection['host'] ?? '')),'.')),0,253);
+			if (!filter_var($host,FILTER_VALIDATE_IP) && !filter_var($host,FILTER_VALIDATE_DOMAIN,FILTER_FLAG_HOSTNAME)) throw new RuntimeException('imap_host_invalid');
+			$connection = [
+				'host'=>$host,
+				'port'=>max(1,min(65535,(int) ($connection['port'] ?? 993))),
+				'security'=>($connection['security'] ?? '') === 'tls' ? 'tls' : 'ssl',
+				'username'=>substr(trim((string) ($connection['username'] ?? '')),0,320),
+				'password'=>(string) ($connection['password'] ?? ''),
+				'auth'=>'password'
+			];
+			$client = new \imap\Client($connection);
+			$client->connect();
+			$folders = $client->folders();
+			return ['result'=>true,'folders'=>count($folders)];
+		} catch (Throwable $exception) {
+			return ['result'=>false,'error'=>substr($exception->getMessage() ?: 'imap_connection_failed',0,160)];
+		} finally {
+			if ($client) $client->close();
+		}
+	}
+
 	public static function run(array $job, array $source, array $destination): array {
 		$started = time();
 		$id = preg_replace('/[^a-z0-9_.-]/i','',(string) ($job['id'] ?? ''));

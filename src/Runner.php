@@ -11,6 +11,7 @@ final class Runner {
 	public static function run(string $id): array {
 		$job = JobStore::get($id);
 		if (!$job || (int) ($job['active'] ?? 0) !== 1 || ($job['phase'] ?? '') === 'completed') return ['success'=>false,'status'=>'not_runnable'];
+		$job = Settings::apply($job);
 
 		$currentMx = DnsMonitor::snapshot((string) ($job['domain'] ?? ''));
 		if (empty($job['baseline_mx']['fingerprint']) && !empty($currentMx['fingerprint'])) $job['baseline_mx'] = $currentMx;
@@ -35,6 +36,7 @@ final class Runner {
 				$stored['failure_count'] = (int) ($stored['failure_count'] ?? 0) + 1;
 				$stored['next_run'] = $finished + max(300,(int) ($stored['interval'] ?? 3600));
 				$stored['last_summary'] = self::summary($result);
+				$stored['stats_total'] = self::accumulate((array) ($stored['stats_total'] ?? []),(array) ($result['stats'] ?? []));
 				if ((int) ($result['stats']['messages_discovered'] ?? 0) > 0) $stored['last_source_change'] = $finished;
 				return $stored;
 			});
@@ -51,6 +53,7 @@ final class Runner {
 			$stored['last_success'] = $finished;
 			$stored['next_run'] = $finished + max(60,(int) ($stored['interval'] ?? 3600));
 			$stored['last_summary'] = self::summary($result);
+			$stored['stats_total'] = self::accumulate((array) ($stored['stats_total'] ?? []),(array) ($result['stats'] ?? []));
 			if ($wasInitial) {
 				$stored['phase'] = 'monitoring';
 				$stored['initial_completed'] = $finished;
@@ -96,5 +99,10 @@ final class Runner {
 			'log'=>(string) ($result['log'] ?? ''),
 			'stats'=>(array) ($result['stats'] ?? [])
 		];
+	}
+
+	private static function accumulate(array $total, array $stats): array {
+		foreach (['messages_discovered','messages_transferred','messages_skipped','bytes_transferred','errors'] as $key) $total[$key] = max(0,(int) ($total[$key] ?? 0)) + max(0,(int) ($stats[$key] ?? 0));
+		return $total;
 	}
 }
