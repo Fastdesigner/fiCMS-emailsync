@@ -150,8 +150,9 @@ final class JobStore {
 	}
 
 	public static function statistics(): array {
-		$statistics = ['jobs'=>0,'active'=>0,'initial'=>0,'monitoring'=>0,'completed'=>0,'failed'=>0,'runs'=>0,'messages_synchronized'=>0,'messages_transferred'=>0,'bytes_transferred'=>0,'last_run'=>0];
-		foreach (self::list() as $job) {
+		$jobs = self::list();
+		$statistics = ['jobs'=>0,'active'=>0,'initial'=>0,'monitoring'=>0,'completed'=>0,'failed'=>0,'runs'=>0,'messages_synchronized'=>0,'messages_transferred'=>0,'bytes_transferred'=>0,'last_run'=>0,'daily'=>Statistics::daily($jobs)];
+		foreach ($jobs as $job) {
 			$statistics['jobs']++;
 			$phase = in_array(($job['phase'] ?? ''),['initial','monitoring','completed'],true) ? $job['phase'] : 'initial';
 			$statistics[$phase]++;
