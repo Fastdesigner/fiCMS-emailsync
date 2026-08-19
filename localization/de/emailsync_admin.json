@@ -40,6 +40,7 @@
   "_emailsync_last_result": "Letztes Ergebnis",
   "_emailsync_result_pending": "Ausstehend",
   "_emailsync_result_running": "Läuft",
+  "_emailsync_result_partial": "Wird fortgesetzt",
   "_emailsync_result_success": "Erfolgreich",
   "_emailsync_result_failed": "Fehlgeschlagen",
   "_emailsync_last_run": "Letzter Lauf",

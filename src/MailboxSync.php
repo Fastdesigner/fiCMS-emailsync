@@ -6,6 +6,9 @@ use RuntimeException;
 use Throwable;
 
 final class MailboxSync {
+	private const SLICE_MESSAGES = 200;
+	private const SLICE_SECONDS = 30;
+
 	public static function probe(): array {
 		$available = class_exists(\imap\Client::class) && \imap\Client::available() && function_exists('sodium_crypto_secretbox');
 		return [
@@ -50,6 +53,7 @@ final class MailboxSync {
 			'started'=>$started,
 			'finished'=>0,
 			'duration'=>0,
+			'partial'=>0,
 			'log'=>State::path($logName),
 			'stats'=>self::stats()
 		];
@@ -60,7 +64,7 @@ final class MailboxSync {
 			ProgressStore::start($id);
 			$clients = [new \imap\Client($source),new \imap\Client($destination)];
 			foreach ($clients as $client) $client->connect();
-			self::transfer($id,$clients[0],$clients[1],$result['stats']);
+			$result['partial'] = self::transfer($id,$clients[0],$clients[1],$result['stats']) ? 0 : 1;
 			$result['success'] = true;
 			$result['exit_code'] = 0;
 		} catch (Throwable $exception) {
@@ -68,7 +72,7 @@ final class MailboxSync {
 			$result['stats']['errors'] = 1;
 		} finally {
 			foreach (array_reverse($clients) as $client) $client->close();
-			if ($id !== '') ProgressStore::finish($id,!empty($result['success']));
+			if ($id !== '') ProgressStore::finish($id,!empty($result['success']),empty($result['partial']));
 		}
 
 		$result['finished'] = time();
@@ -77,7 +81,7 @@ final class MailboxSync {
 		return $result;
 	}
 
-	private static function transfer(string $jobId, \imap\Client $source, \imap\Client $destination, array &$stats): void {
+	private static function transfer(string $jobId, \imap\Client $source, \imap\Client $destination, array &$stats): bool {
 		$progress = ProgressStore::get($jobId);
 		$sourceFolders = $source->folders();
 		$destinationFolders = $destination->folders();
@@ -104,9 +108,11 @@ final class MailboxSync {
 			$total += count($uids);
 			$plan[] = ['source'=>$sourceName,'destination'=>$destinationName,'status'=>$sourceStatus,'stored'=>$stored,'uids'=>$uids];
 		}
-		ProgressStore::plan($jobId,$total);
+		$processed = max(0,$stats['messages_source'] - $total);
+		ProgressStore::plan($jobId,$stats['messages_source'],$processed);
 
-		$processed = 0;
+		$sliceProcessed = 0;
+		$deadline = time() + self::SLICE_SECONDS;
 		foreach ($plan as $folder) {
 			$sourceName = $folder['source'];
 			$destinationName = $folder['destination'];
@@ -128,6 +134,7 @@ final class MailboxSync {
 			}
 
 			foreach ($uids as $uid) {
+				if ($sliceProcessed >= self::SLICE_MESSAGES || ($sliceProcessed > 0 && time() >= $deadline)) return false;
 				$stats['messages_discovered']++;
 				$message = $source->fetch($uid);
 				try {
@@ -147,10 +154,12 @@ final class MailboxSync {
 					fclose($message['stream']);
 				}
 				$processed++;
+				$sliceProcessed++;
 				$progress = ProgressStore::checkpoint($jobId,$sourceName,(int) $sourceStatus['uidvalidity'],$uid,$destinationUid,$processed);
 			}
 			$destination->subscribe($destinationNames[$destinationKey]);
 		}
+		return true;
 	}
 
 	private static function exists(\imap\Client $destination, array $uids, int $size, string $hash): bool {

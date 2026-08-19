@@ -40,6 +40,7 @@
   "_emailsync_last_result": "Último resultado",
   "_emailsync_result_pending": "Pendiente",
   "_emailsync_result_running": "En curso",
+  "_emailsync_result_partial": "Continúa con el siguiente cron",
   "_emailsync_result_success": "Correcto",
   "_emailsync_result_failed": "Fallido",
   "_emailsync_last_run": "Última ejecución",

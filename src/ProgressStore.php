@@ -22,11 +22,11 @@ final class ProgressStore {
 		return $updated;
 	}
 
-	public static function plan(string $jobId, int $total): array {
-		$updated = State::update('progress/'.self::id($jobId).'.json',function(array $progress) use ($total): array {
+	public static function plan(string $jobId, int $total, int $processed = 0): array {
+		$updated = State::update('progress/'.self::id($jobId).'.json',function(array $progress) use ($total,$processed): array {
 			if (!isset($progress['run']) || !is_array($progress['run'])) $progress['run'] = [];
 			$progress['run']['total'] = max(0,$total);
-			$progress['run']['processed'] = min(max(0,(int) ($progress['run']['processed'] ?? 0)),$progress['run']['total']);
+			$progress['run']['processed'] = min(max(0,$processed),$progress['run']['total']);
 			return $progress;
 		});
 		if (!is_array($updated)) throw new \RuntimeException('progress_write_failed');
@@ -57,12 +57,12 @@ final class ProgressStore {
 		return is_array($folder) ? $folder : [];
 	}
 
-	public static function finish(string $jobId, bool $success): array {
-		$updated = State::update('progress/'.self::id($jobId).'.json',function(array $progress) use ($success): array {
+	public static function finish(string $jobId, bool $success, bool $complete = true): array {
+		$updated = State::update('progress/'.self::id($jobId).'.json',function(array $progress) use ($success,$complete): array {
 			if (!isset($progress['run']) || !is_array($progress['run'])) $progress['run'] = [];
 			$progress['run']['finished'] = (int) ($_SERVER['now'] ?? time());
 			$progress['run']['success'] = $success ? 1 : 0;
-			if ($success) $progress['run']['processed'] = max(0,(int) ($progress['run']['total'] ?? 0));
+			if ($success && $complete) $progress['run']['processed'] = max(0,(int) ($progress['run']['total'] ?? 0));
 			return $progress;
 		});
 		if (!is_array($updated)) throw new \RuntimeException('progress_write_failed');
@@ -74,9 +74,7 @@ final class ProgressStore {
 		$run = (array) (self::get((string) ($job['id'] ?? ''))['run'] ?? []);
 		$total = max(0,(int) ($run['total'] ?? 0));
 		$processed = max(0,(int) ($run['processed'] ?? 0));
-		$completed = max(0,(int) ($job['stats_total']['messages_discovered'] ?? 0));
-		if ($total > 0 && !empty($run['finished'])) return min(1,$completed / max(1,$completed + max(0,$total - $processed)));
-		if ($total > 0) return min(1,($completed + $processed) / max(1,$completed + $total));
+		if ($total > 0) return min(1,$processed / $total);
 		if (($job['phase'] ?? '') === 'monitoring' || !empty($run['success'])) return 1;
 		return 0;
 	}

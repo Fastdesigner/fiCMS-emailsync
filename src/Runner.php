@@ -44,6 +44,20 @@ final class Runner {
 			if ($firstFailure) JobStore::event($id,'failed',self::summary($result));
 			return $result + ['job'=>$job];
 		}
+		if (!empty($result['partial'])) {
+			$job = JobStore::update($id,function(array $stored) use ($result,$finished): array {
+				$stored['last_result'] = 'partial';
+				$stored['last_error'] = '';
+				$stored['failure_count'] = 0;
+				$stored['last_success'] = $finished;
+				$stored['next_run'] = $finished + 60;
+				$stored['last_summary'] = self::summary($result);
+				$stored['stats_total'] = self::accumulate((array) ($stored['stats_total'] ?? []),(array) ($result['stats'] ?? []));
+				if ((int) ($result['stats']['messages_discovered'] ?? 0) > 0) $stored['last_source_change'] = $finished;
+				return $stored;
+			});
+			return $result + ['job'=>$job];
+		}
 
 		$wasInitial = ($job['phase'] ?? 'initial') === 'initial';
 		$job = JobStore::update($id,function(array $stored) use ($result,$finished,$wasInitial): array {
@@ -97,6 +111,7 @@ final class Runner {
 			'started'=>(int) ($result['started'] ?? 0),
 			'finished'=>(int) ($result['finished'] ?? 0),
 			'duration'=>(int) ($result['duration'] ?? 0),
+			'partial'=>!empty($result['partial']) ? 1 : 0,
 			'log'=>(string) ($result['log'] ?? ''),
 			'stats'=>(array) ($result['stats'] ?? [])
 		];
