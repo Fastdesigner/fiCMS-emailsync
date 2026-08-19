@@ -1,6 +1,6 @@
 <?php
 
-if (!$site['onsite']) return;
+if (!$site['onsite'] || !helper__system_runtime('emailsync_worker',20,false,'minutes')) return;
 
 $emailsync = ['result'=>[]];
 set_time_limit(0);

@@ -49,23 +49,26 @@ final class Statistics {
 	public static function series(string $jobId, int $total, int $runs, int $windowHours, int $now = 0): array {
 		if ($runs < 1) return [];
 		$windowHours = max(2,$windowHours);
-		$step = max(3600,(int) ceil($windowHours / 48) * 3600);
 		$now = $now > 0 ? $now : time();
-		$end = (int) (floor($now / $step) * $step);
-		$start = $end - (int) ceil(($windowHours * 3600) / $step) * $step;
+		$end = (int) (floor($now / 3600) * 3600);
+		$start = $end - $windowHours * 3600;
+		$step = max(3600,(int) ceil(($end - $start) / 11 / 3600) * 3600);
+		$timestamps = [$start];
+		for ($timestamp = $start + $step; $timestamp < $end; $timestamp += $step) $timestamps[] = $timestamp;
+		if ($end > $start) $timestamps[] = $end;
 		$grouped = [];
 		$windowTotal = 0;
 		foreach (self::get($jobId)['data'] as $timestamp => $row) {
 			$timestamp = (int) $timestamp;
 			if ($timestamp < $start || $timestamp > $now) continue;
 			$amount = max(0,(int) ($row['messages_synchronized'] ?? $row['messages_transferred'] ?? 0));
-			$bucket = max($start,(int) (floor($timestamp / $step) * $step));
+			$bucket = $timestamps[min(count($timestamps) - 1,(int) floor(($timestamp - $start) / $step))];
 			$grouped[$bucket] = (int) ($grouped[$bucket] ?? 0) + $amount;
 			$windowTotal += $amount;
 		}
 		$points = [];
 		$cumulative = max(0,$total - $windowTotal);
-		for ($timestamp = $start; $timestamp <= $end; $timestamp += $step) {
+		foreach ($timestamps as $timestamp) {
 			$cumulative += (int) ($grouped[$timestamp] ?? 0);
 			$points[] = ['time'=>$timestamp,'value'=>$cumulative];
 		}

@@ -6,8 +6,7 @@ use RuntimeException;
 use Throwable;
 
 final class MailboxSync {
-	private const SLICE_MESSAGES = 200;
-	private const SLICE_SECONDS = 30;
+	private const SLICE_SECONDS = 3;
 
 	public static function probe(): array {
 		$available = class_exists(\imap\Client::class) && \imap\Client::available() && function_exists('sodium_crypto_secretbox');
@@ -112,7 +111,7 @@ final class MailboxSync {
 		ProgressStore::plan($jobId,$stats['messages_source'],$processed);
 
 		$sliceProcessed = 0;
-		$deadline = time() + self::SLICE_SECONDS;
+		$deadline = microtime(true) + self::SLICE_SECONDS;
 		foreach ($plan as $folder) {
 			$sourceName = $folder['source'];
 			$destinationName = $folder['destination'];
@@ -134,7 +133,7 @@ final class MailboxSync {
 			}
 
 			foreach ($uids as $uid) {
-				if ($sliceProcessed >= self::SLICE_MESSAGES || ($sliceProcessed > 0 && time() >= $deadline)) return false;
+				if ($sliceProcessed > 0 && microtime(true) >= $deadline) return false;
 				$stats['messages_discovered']++;
 				$stats['messages_synchronized']++;
 				$message = $source->fetch($uid);

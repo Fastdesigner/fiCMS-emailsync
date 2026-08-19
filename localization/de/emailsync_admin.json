@@ -27,6 +27,7 @@
   "_emailsync_tab_settings": "Einstellungen",
   "_emailsync_tab_statistics": "Statistiken",
   "_emailsync_connection_pending": "Verbindungsdaten noch unvollständig",
+  "_emailsync_connection_saved": "Verbindung gespeichert",
   "_emailsync_connection_checking": "Verbindung wird geprüft …",
   "_emailsync_connection_ready": "Verbindung hergestellt · %count% Ordner gefunden",
   "_emailsync_connection_failed": "Verbindung fehlgeschlagen · %error%",

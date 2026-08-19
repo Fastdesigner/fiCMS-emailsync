@@ -12,6 +12,7 @@ final class McpView {
 			'statistics'=>JobStore::statistics(),
 			'jobs'=>array_values(array_map(fn(array $job): array => self::job($job,false),JobStore::list()))
 		];
+		if ($id === 'settings') return ['type'=>'emailsync','settings'=>Settings::get()];
 		if ($id === 'jobs') return ['type'=>'emailsync','jobs'=>array_values(array_map(fn(array $job): array => self::job($job,false),JobStore::list()))];
 		if (str_starts_with($id,'folders:')) return self::folders(substr($id,8));
 		if (str_starts_with($id,'job:')) $id = substr($id,4);

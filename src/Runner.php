@@ -51,7 +51,7 @@ final class Runner {
 				$stored['last_error'] = '';
 				$stored['failure_count'] = 0;
 				$stored['last_success'] = $finished;
-				$stored['next_run'] = $finished + 60;
+				$stored['next_run'] = $finished + 1200;
 				$stored['last_summary'] = self::summary($result);
 				$stored['stats_total'] = self::totals((array) ($stored['stats_total'] ?? []),$result);
 				if ((int) ($result['stats']['messages_discovered'] ?? 0) > 0) $stored['last_source_change'] = $finished;

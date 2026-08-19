@@ -107,6 +107,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			if ($job['active'] === 1) $job['next_run'] = 0;
 			return $job;
 		});
+		if ((int) ($emailsync['job']['active'] ?? 0) === 1) helper__system_runtime('emailsync_worker',(int) ($_SERVER['now'] ?? time()),true,'seconds');
 		$emailsync['output']['result'] = ['result'=>!empty($emailsync['job'])];
 		$_POST['handled'] = true;
 	}
@@ -173,12 +174,12 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 		foreach (['source','destination'] as $emailsync['side']) {
 			$emailsync['connection_items'] = [];
 			foreach (['host','port','security','username','password'] as $emailsync['field']) $emailsync['connection_items'][] = ['id'=>$settings['key'].'-'.$emailsync['side'].'-'.$emailsync['field'],'type'=>'form','classes'=>['forms__item'],'form'=>$emailsync['formitems'][$emailsync['side'].'_'.$emailsync['field']]];
-			$emailsync['connection_items'][] = ['id'=>$settings['key'].'-'.$emailsync['side'].'-status','tag'=>'font','classes'=>['forms__item'],'attributes'=>['data-emailsync-connection-status'=>$emailsync['side']],'description'=>language__get($user['language'],'_emailsync_connection_pending')];
+			$emailsync['connection_items'][] = ['id'=>$settings['key'].'-'.$emailsync['side'].'-status','tag'=>'font','classes'=>['forms__item'],'attributes'=>['data-emailsync-connection-status'=>$emailsync['side'],'data-notify'=>!empty($emailsync[$emailsync['side']]['has_secret']) ? 'success' : 'warning'],'description'=>language__get($user['language'],!empty($emailsync[$emailsync['side']]['has_secret']) ? '_emailsync_connection_saved' : '_emailsync_connection_pending')];
 			$emailsync['dropdown'] = create__dropdown(
 				$settings['key'].'-'.$emailsync['side'],
 				language__get($user['language'],'_emailsync_tab_'.$emailsync['side']),
 				['id'=>$settings['key'].'-'.$emailsync['side'].'-fields','tag'=>'div','classes'=>['forms__wrapper'],'items'=>$emailsync['connection_items']],
-				['subtitle'=>language__get($user['language'],'_emailsync_connection_pending'),'notify'=>'warning']
+				['subtitle'=>language__get($user['language'],!empty($emailsync[$emailsync['side']]['has_secret']) ? '_emailsync_connection_saved' : '_emailsync_connection_pending'),'notify'=>!empty($emailsync[$emailsync['side']]['has_secret']) ? 'success' : 'warning']
 			);
 			$emailsync['dropdown']['mainattributes']['data-emailsync-connection'] = $emailsync['side'];
 			$emailsync['dropdown']['mainattributes']['data-emailsync-job'] = empty($emailsync['job']) ? 'new' : (string) $emailsync['job']['id'];
@@ -200,8 +201,10 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			$emailsync['job_graph'] = ['series'=>['messages_synchronized'=>[]],'points'=>[]];
 			$emailsync['job_progress'] = \emailsync\ProgressStore::get((string) $emailsync['job']['id']);
 			$emailsync['job_synchronized'] = max(0,(int) ($emailsync['job']['stats_total']['messages_synchronized'] ?? 0),(int) ($emailsync['job_progress']['run']['processed'] ?? 0));
+			$emailsync['job_graph']['series']['messages_synchronized']['value'] = $emailsync['job_synchronized'];
 			$emailsync['job_series'] = \emailsync\Statistics::series((string) $emailsync['job']['id'],$emailsync['job_synchronized'],max(0,(int) ($emailsync['job']['run_count'] ?? 0)),max(2,(int) ceil($emailsync['plugin_settings']['quiet_period'] / 3600) * 2),(int) ($_SERVER['now'] ?? time()));
-			foreach ($emailsync['job_series'] as $emailsync['point']) $emailsync['job_graph']['points'][] = ['label'=>format__date_relative((int) $emailsync['point']['time'],'relative',$user['language'],true),'data'=>['messages_synchronized'=>(int) $emailsync['point']['value']]];
+			$emailsync['job_formatter'] = IntlDateFormatter::create($user['language'],IntlDateFormatter::SHORT,IntlDateFormatter::SHORT);
+			foreach ($emailsync['job_series'] as $emailsync['point']) $emailsync['job_graph']['points'][] = ['label'=>$emailsync['job_formatter']->format((int) $emailsync['point']['time']),'data'=>['messages_synchronized'=>(int) $emailsync['point']['value']]];
 			$emailsync['job_statistic_items'] = [];
 			if (count($emailsync['job_graph']['points'])) $emailsync['job_statistic_items'][] = ['id'=>$settings['key'].'-'.$emailsync['job']['id'].'-graph','type'=>'statistics','chart'=>'graph','attributes'=>['data-span'=>'all','data-label'=>language__get($user['language'],'_emailsync_statistics_progress')],'values'=>statistics__format_graph($user['language'],$emailsync['job_graph'],['messages_synchronized'=>'_emailsync_statistics_messages_synchronized'],['gridLines'=>4,'legend'=>false,'smooth'=>false,'decimals'=>0])];
 			foreach (['messages_transferred','messages_discovered','messages_skipped','runs','errors'] as $emailsync['stat']) {

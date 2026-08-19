@@ -27,6 +27,7 @@
   "_emailsync_tab_settings": "Settings",
   "_emailsync_tab_statistics": "Statistics",
   "_emailsync_connection_pending": "Connection details are incomplete",
+  "_emailsync_connection_saved": "Connection saved",
   "_emailsync_connection_checking": "Checking connection …",
   "_emailsync_connection_ready": "Connected · %count% folders found",
   "_emailsync_connection_failed": "Connection failed · %error%",

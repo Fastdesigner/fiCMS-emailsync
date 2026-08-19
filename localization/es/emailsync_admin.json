@@ -27,6 +27,7 @@
   "_emailsync_tab_settings": "Ajustes",
   "_emailsync_tab_statistics": "Estadísticas",
   "_emailsync_connection_pending": "Faltan datos de conexión",
+  "_emailsync_connection_saved": "Conexión guardada",
   "_emailsync_connection_checking": "Comprobando conexión …",
   "_emailsync_connection_ready": "Conectado · %count% carpetas encontradas",
   "_emailsync_connection_failed": "Conexión fallida · %error%",

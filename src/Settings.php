@@ -20,7 +20,7 @@ final class Settings {
 
 	private static function normalize(array $data): array {
 		return [
-			'interval'=>max(60,(int) ($data['interval'] ?? 3600)),
+			'interval'=>max(60,(int) ($data['interval'] ?? 1200)),
 			'quiet_period'=>max(3600,(int) ($data['quiet_period'] ?? 172800)),
 			'minimum_monitoring'=>max(86400,(int) ($data['minimum_monitoring'] ?? 604800)),
 			'fallback_ttl'=>max(300,(int) ($data['fallback_ttl'] ?? 86400))
