@@ -252,7 +252,7 @@ $emailsync['settings_items'] = [[
 	'type'=>'form',
 	'classes'=>['forms__item'],
 	'attributes'=>['data-notify'=>$emailsync['probe']['available'] ? 'success' : 'error'],
-	'form'=>['type'=>'checkbox','option'=>'runtime_available','name'=>language__get($user['language'],$emailsync['probe']['available'] ? '_emailsync_runtime_available' : '_emailsync_runtime_unavailable'),'value'=>$emailsync['probe']['available'] ? 1 : 0,'disabled'=>true]
+	'form'=>['type'=>'input','option'=>'runtime_status','name'=>language__get($user['language'],'_emailsync_runtime_status'),'value'=>language__get($user['language'],$emailsync['probe']['available'] ? '_emailsync_runtime_available' : '_emailsync_runtime_unavailable'),'attributes'=>['disabled'=>true]]
 ]];
 foreach (['interval_minutes','quiet_hours','monitoring_days','fallback_ttl_hours'] as $emailsync['field']) $emailsync['settings_items'][] = ['id'=>$settings['key'].'-setting-'.$emailsync['field'],'type'=>'form','classes'=>['forms__item'],'form'=>$emailsync['settings_formitems'][$emailsync['field']]];
 $emailsync['settings_items'][] = ['id'=>$settings['key'].'-settings-save','tag'=>'button','classes'=>['system-button'],'attributes'=>['type'=>'button'],'description'=>language__get($user['language'],'_settings_form_save'),'actions'=>['load'=>['action'=>'save_settings']]];
