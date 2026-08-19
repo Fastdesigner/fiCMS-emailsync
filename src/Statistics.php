@@ -6,6 +6,7 @@ final class Statistics {
 	private const DEFAULTS = [
 		'runs'=>0,
 		'messages_discovered'=>0,
+		'messages_synchronized'=>0,
 		'messages_transferred'=>0,
 		'messages_skipped'=>0,
 		'bytes_transferred'=>0,
@@ -17,6 +18,7 @@ final class Statistics {
 		$values = [
 			'runs'=>1,
 			'messages_discovered'=>max(0,(int) ($stats['messages_discovered'] ?? 0)),
+			'messages_synchronized'=>max(0,(int) ($stats['messages_synchronized'] ?? $stats['messages_discovered'] ?? 0)),
 			'messages_transferred'=>max(0,(int) ($stats['messages_transferred'] ?? 0)),
 			'messages_skipped'=>max(0,(int) ($stats['messages_skipped'] ?? 0)),
 			'bytes_transferred'=>max(0,(int) ($stats['bytes_transferred'] ?? 0)),
@@ -56,7 +58,7 @@ final class Statistics {
 		foreach (self::get($jobId)['data'] as $timestamp => $row) {
 			$timestamp = (int) $timestamp;
 			if ($timestamp < $start || $timestamp > $now) continue;
-			$amount = max(0,(int) ($row['messages_transferred'] ?? 0));
+			$amount = max(0,(int) ($row['messages_synchronized'] ?? $row['messages_transferred'] ?? 0));
 			$bucket = max($start,(int) (floor($timestamp / $step) * $step));
 			$grouped[$bucket] = (int) ($grouped[$bucket] ?? 0) + $amount;
 			$windowTotal += $amount;

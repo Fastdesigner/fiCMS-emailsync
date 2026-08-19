@@ -27,6 +27,7 @@ final class Runner {
 		$destination = \imap\ConnectionStore::credentials((string) ($job['destination_id'] ?? ''));
 		$result = MailboxSync::run($job,$source,$destination);
 		$finished = (int) ($result['finished'] ?? time());
+		$result['synchronized_total'] = max(0,(int) (ProgressStore::get($id)['run']['processed'] ?? 0));
 		Statistics::add($id,$result,max(2,(int) ceil(((int) ($job['quiet_period'] ?? 172800)) / 3600) * 2));
 
 		if (empty($result['success'])) {
@@ -37,7 +38,7 @@ final class Runner {
 				$stored['failure_count'] = (int) ($stored['failure_count'] ?? 0) + 1;
 				$stored['next_run'] = $finished + max(300,(int) ($stored['interval'] ?? 3600));
 				$stored['last_summary'] = self::summary($result);
-				$stored['stats_total'] = self::accumulate((array) ($stored['stats_total'] ?? []),(array) ($result['stats'] ?? []));
+				$stored['stats_total'] = self::totals((array) ($stored['stats_total'] ?? []),$result);
 				if ((int) ($result['stats']['messages_discovered'] ?? 0) > 0) $stored['last_source_change'] = $finished;
 				return $stored;
 			});
@@ -52,7 +53,7 @@ final class Runner {
 				$stored['last_success'] = $finished;
 				$stored['next_run'] = $finished + 60;
 				$stored['last_summary'] = self::summary($result);
-				$stored['stats_total'] = self::accumulate((array) ($stored['stats_total'] ?? []),(array) ($result['stats'] ?? []));
+				$stored['stats_total'] = self::totals((array) ($stored['stats_total'] ?? []),$result);
 				if ((int) ($result['stats']['messages_discovered'] ?? 0) > 0) $stored['last_source_change'] = $finished;
 				return $stored;
 			});
@@ -68,7 +69,7 @@ final class Runner {
 			$stored['last_success'] = $finished;
 			$stored['next_run'] = $finished + max(60,(int) ($stored['interval'] ?? 3600));
 			$stored['last_summary'] = self::summary($result);
-			$stored['stats_total'] = self::accumulate((array) ($stored['stats_total'] ?? []),(array) ($result['stats'] ?? []));
+			$stored['stats_total'] = self::totals((array) ($stored['stats_total'] ?? []),$result);
 			if ($wasInitial) {
 				$stored['phase'] = 'monitoring';
 				$stored['initial_completed'] = $finished;
@@ -118,7 +119,13 @@ final class Runner {
 	}
 
 	private static function accumulate(array $total, array $stats): array {
-		foreach (['messages_discovered','messages_transferred','messages_skipped','bytes_transferred','errors'] as $key) $total[$key] = max(0,(int) ($total[$key] ?? 0)) + max(0,(int) ($stats[$key] ?? 0));
+		foreach (['messages_discovered','messages_synchronized','messages_transferred','messages_skipped','bytes_transferred','errors'] as $key) $total[$key] = max(0,(int) ($total[$key] ?? 0)) + max(0,(int) ($stats[$key] ?? 0));
+		return $total;
+	}
+
+	private static function totals(array $total, array $result): array {
+		$total = self::accumulate($total,(array) ($result['stats'] ?? []));
+		$total['messages_synchronized'] = max((int) ($total['messages_synchronized'] ?? 0),(int) ($result['synchronized_total'] ?? 0));
 		return $total;
 	}
 }

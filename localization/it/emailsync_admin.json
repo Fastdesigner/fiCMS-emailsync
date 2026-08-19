@@ -71,6 +71,7 @@
   "_emailsync_statistics_failed": "Falliti",
   "_emailsync_statistics_runs": "Esecuzioni",
   "_emailsync_statistics_progress": "Email totali",
+  "_emailsync_statistics_messages_synchronized": "Sincronizzati",
   "_emailsync_statistics_messages_transferred": "Trasferiti",
   "_emailsync_statistics_messages_discovered": "Nuovi",
   "_emailsync_statistics_messages_skipped": "Ignorati",

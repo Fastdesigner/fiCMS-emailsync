@@ -136,6 +136,7 @@ final class MailboxSync {
 			foreach ($uids as $uid) {
 				if ($sliceProcessed >= self::SLICE_MESSAGES || ($sliceProcessed > 0 && time() >= $deadline)) return false;
 				$stats['messages_discovered']++;
+				$stats['messages_synchronized']++;
 				$message = $source->fetch($uid);
 				try {
 					$hash = \imap\Client::hash($message['stream']);
@@ -224,6 +225,7 @@ final class MailboxSync {
 	private static function stats(): array {
 		return [
 			'messages_discovered'=>0,
+			'messages_synchronized'=>0,
 			'messages_transferred'=>0,
 			'messages_skipped'=>0,
 			'messages_source'=>0,
