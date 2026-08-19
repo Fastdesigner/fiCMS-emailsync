@@ -7,7 +7,7 @@ use Throwable;
 
 final class MailboxSync {
 	public static function probe(): array {
-		$available = \imap\Client::available() && function_exists('sodium_crypto_secretbox');
+		$available = class_exists(\imap\Client::class) && \imap\Client::available() && function_exists('sodium_crypto_secretbox');
 		return [
 			'available'=>$available ? 1 : 0,
 			'version'=>'Pure PHP IMAP/TLS',
