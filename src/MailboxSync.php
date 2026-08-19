@@ -6,7 +6,7 @@ use RuntimeException;
 use Throwable;
 
 final class MailboxSync {
-	private const SLICE_SECONDS = 3;
+	private const SLICE_SECONDS = 5;
 
 	public static function probe(): array {
 		$available = class_exists(\imap\Client::class) && \imap\Client::available() && function_exists('sodium_crypto_secretbox');
