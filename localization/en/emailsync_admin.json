@@ -62,7 +62,6 @@
   "_emailsync_event_completed": "Synchronization for %domain% completed on %date%. The TTL, minimum monitoring and quiet periods have elapsed; the stored mailbox passwords were deleted.",
   "_emailsync_event_failed": "Synchronization for %domain% failed on %date% and will be retried by the next due cron run.",
   "_emailsync_run_summary": "Synchronization progress",
-  "_emailsync_messages_transferred": "Newly copied in this run",
   "_emailsync_statistics_jobs": "Jobs",
   "_emailsync_statistics_active": "Active",
   "_emailsync_statistics_initial": "Initial sync",

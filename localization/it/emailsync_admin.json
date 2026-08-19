@@ -62,7 +62,6 @@
   "_emailsync_event_completed": "La sincronizzazione di %domain% è terminata il %date%. I periodi TTL, di monitoraggio e di inattività sono trascorsi; le password salvate sono state eliminate.",
   "_emailsync_event_failed": "La sincronizzazione di %domain% non è riuscita il %date% e verrà riprovata alla prossima esecuzione cron prevista.",
   "_emailsync_run_summary": "Stato della sincronizzazione",
-  "_emailsync_messages_transferred": "Nuovi copiati in questa esecuzione",
   "_emailsync_statistics_jobs": "Job",
   "_emailsync_statistics_active": "Attivi",
   "_emailsync_statistics_initial": "Iniziale",

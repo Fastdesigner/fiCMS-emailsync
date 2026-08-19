@@ -38,7 +38,6 @@ foreach ($reports['recipients'] as $reports['emailsync_email'] => $reports['emai
 	foreach ($reports['emailsync_events'] as $reports['emailsync_event']) {
 		if ((int) ($reports['emailsync_event']['report_user_id'] ?? 0) !== (int) ($reports['emailsync_recipient']['user']['id'] ?? 0) && strcasecmp((string) ($reports['emailsync_event']['report_email'] ?? ''),(string) $reports['emailsync_email']) !== 0) continue;
 		$reports['emailsync_summary'] = (array) ($reports['emailsync_event']['summary'] ?? []);
-		$reports['emailsync_stats'] = (array) ($reports['emailsync_summary']['stats'] ?? []);
 		$reports['emailsync_progress'] = (array) ($reports['emailsync_summary']['progress'] ?? []);
 		if (!$reports['emailsync_progress'] && !empty($reports['emailsync_event']['job_id'])) $reports['emailsync_progress'] = \emailsync\ProgressStore::summary(\emailsync\JobStore::get((string) $reports['emailsync_event']['job_id']));
 		$reports['emailsync_progress_percent'] = (int) ($reports['emailsync_progress']['total'] ?? 0) > 0 ? min(100,(int) round(((int) ($reports['emailsync_progress']['processed'] ?? 0) / (int) $reports['emailsync_progress']['total']) * 100)) : (!empty($reports['emailsync_summary']['success']) ? 100 : 0);
@@ -64,8 +63,7 @@ foreach ($reports['recipients'] as $reports['emailsync_email'] => $reports['emai
 			'metric'=>reports__metrics([
 				['key'=>'messages_total','label'=>'_emailsync_statistics_messages_total','value'=>(int) ($reports['emailsync_progress']['total'] ?? 0)],
 				['key'=>'messages_processed','label'=>'_emailsync_statistics_messages_processed','value'=>(int) ($reports['emailsync_progress']['processed'] ?? 0)],
-				['key'=>'messages_pending','label'=>'_emailsync_statistics_messages_pending','value'=>(int) ($reports['emailsync_progress']['pending'] ?? 0)],
-				['key'=>'messages_transferred','label'=>'_emailsync_messages_transferred','value'=>(int) ($reports['emailsync_stats']['messages_transferred'] ?? 0)]
+				['key'=>'messages_pending','label'=>'_emailsync_statistics_messages_pending','value'=>(int) ($reports['emailsync_progress']['pending'] ?? 0)]
 			])
 		]];
 		$reports['emailsync_sent'][$reports['emailsync_event']['id']] = true;

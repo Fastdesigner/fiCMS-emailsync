@@ -62,7 +62,6 @@
   "_emailsync_event_completed": "Die Synchronisierung für %domain% wurde am %date% abgeschlossen. TTL-, Mindestüberwachungs- und Ruhezeit sind erfüllt; die gespeicherten Postfach-Passwörter wurden gelöscht.",
   "_emailsync_event_failed": "Die Synchronisierung für %domain% ist am %date% fehlgeschlagen und wird beim nächsten fälligen Cron erneut versucht.",
   "_emailsync_run_summary": "Stand der Synchronisierung",
-  "_emailsync_messages_transferred": "In diesem Lauf neu kopiert",
   "_emailsync_statistics_jobs": "Jobs",
   "_emailsync_statistics_active": "Aktiv",
   "_emailsync_statistics_initial": "Erstsync",
