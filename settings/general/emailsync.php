@@ -180,9 +180,9 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 				['id'=>$settings['key'].'-'.$emailsync['side'].'-fields','tag'=>'div','classes'=>['forms__wrapper'],'items'=>$emailsync['connection_items']],
 				['subtitle'=>language__get($user['language'],'_emailsync_connection_pending'),'notify'=>'warning']
 			);
-			$emailsync['dropdown']['attributes']['data-emailsync-connection'] = $emailsync['side'];
-			$emailsync['dropdown']['attributes']['data-emailsync-job'] = empty($emailsync['job']) ? 'new' : (string) $emailsync['job']['id'];
-			$emailsync['dropdown']['attributes']['data-emailsync-has-secret'] = !empty($emailsync[$emailsync['side']]['has_secret']) ? '1' : '0';
+			$emailsync['dropdown']['mainattributes']['data-emailsync-connection'] = $emailsync['side'];
+			$emailsync['dropdown']['mainattributes']['data-emailsync-job'] = empty($emailsync['job']) ? 'new' : (string) $emailsync['job']['id'];
+			$emailsync['dropdown']['mainattributes']['data-emailsync-has-secret'] = !empty($emailsync[$emailsync['side']]['has_secret']) ? '1' : '0';
 			$emailsync['form'][] = $emailsync['dropdown'];
 		}
 		$emailsync['form'] = [['id'=>$settings['key'].'-job-fields','tag'=>'div','classes'=>['forms__wrapper'],'items'=>$emailsync['form']]];
@@ -197,20 +197,9 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			if (!empty($emailsync['job']['cutover_detected'])) $emailsync['status_items'][] = ['id'=>$settings['key'].'-'.$emailsync['job']['id'].'-cutover','classes'=>['forms__item'],'description'=>language__get($user['language'],'_emailsync_cutover'),'subtitle'=>format__date_relative((int) $emailsync['job']['cutover_detected'],'relative',$user['language'],true)];
 			if (!empty($emailsync['job']['baseline_mx']['targets'])) $emailsync['status_items'][] = ['id'=>$settings['key'].'-'.$emailsync['job']['id'].'-baseline-mx','classes'=>['forms__item'],'description'=>language__get($user['language'],'_emailsync_baseline_mx'),'subtitle'=>htmlspecialchars(implode(', ',(array) $emailsync['job']['baseline_mx']['targets']),ENT_QUOTES,'UTF-8')];
 			if (($emailsync['job']['phase'] ?? '') === 'monitoring') $emailsync['status_items'][] = ['id'=>$settings['key'].'-'.$emailsync['job']['id'].'-cutover-action','tag'=>'button','classes'=>['system-button'],'attributes'=>['type'=>'button','data-confirmation'=>language__get($user['language'],empty($emailsync['job']['cutover_detected']) ? '_emailsync_cutover_confirm' : '_emailsync_reset_cutover_confirm')],'description'=>language__get($user['language'],empty($emailsync['job']['cutover_detected']) ? '_emailsync_cutover_manual' : '_emailsync_reset_cutover'),'actions'=>['load'=>['action'=>empty($emailsync['job']['cutover_detected']) ? 'cutover' : 'reset_cutover','id'=>$emailsync['job']['id']]]];
-			$emailsync['status_items'][] = ['id'=>$settings['key'].'-'.$emailsync['job']['id'].'-delete','tag'=>'button','classes'=>['system-button'],'attributes'=>['type'=>'button','data-confirmation'=>language__get($user['language'],'_ui_confirm_delete')],'description'=>language__get($user['language'],'_emailsync_delete'),'actions'=>['load'=>['action'=>'delete','id'=>$emailsync['job']['id']]]];
-
-			$emailsync['job_statistics'] = \emailsync\Statistics::get((string) $emailsync['job']['id']);
 			$emailsync['job_graph'] = ['series'=>['messages_transferred'=>[]],'points'=>[]];
-			$emailsync['job_recorded'] = max(0,(int) ($emailsync['job_statistics']['totals']['messages_transferred'] ?? 0));
-			$emailsync['job_cumulative'] = max(0,(int) ($emailsync['job']['stats_total']['messages_transferred'] ?? 0) - $emailsync['job_recorded']);
-			if ($emailsync['job_cumulative'] > 0) $emailsync['job_graph']['points'][] = ['label'=>format__date_relative((int) ($emailsync['job']['created'] ?? $_SERVER['now']),'date',$user['language']),'data'=>['messages_transferred'=>$emailsync['job_cumulative']]];
-			if (isset($emailsync['job_statistics']['data']) && is_array($emailsync['job_statistics']['data'])) {
-				ksort($emailsync['job_statistics']['data']);
-				foreach ($emailsync['job_statistics']['data'] as $emailsync['date'] => $emailsync['row']) {
-					$emailsync['job_cumulative'] += max(0,(int) ($emailsync['row']['messages_transferred'] ?? 0));
-					$emailsync['job_graph']['points'][] = ['label'=>format__date_relative((int) $emailsync['date'],'date',$user['language']),'data'=>['messages_transferred'=>$emailsync['job_cumulative']]];
-				}
-			}
+			$emailsync['job_series'] = \emailsync\Statistics::series((string) $emailsync['job']['id'],max(0,(int) ($emailsync['job']['stats_total']['messages_transferred'] ?? 0)),max(0,(int) ($emailsync['job']['run_count'] ?? 0)),max(2,(int) ceil($emailsync['plugin_settings']['quiet_period'] / 3600) * 2),(int) ($_SERVER['now'] ?? time()));
+			foreach ($emailsync['job_series'] as $emailsync['point']) $emailsync['job_graph']['points'][] = ['label'=>format__date_relative((int) $emailsync['point']['time'],'relative',$user['language'],true),'data'=>['messages_transferred'=>(int) $emailsync['point']['value']]];
 			$emailsync['job_statistic_items'] = [];
 			if (count($emailsync['job_graph']['points'])) $emailsync['job_statistic_items'][] = ['id'=>$settings['key'].'-'.$emailsync['job']['id'].'-graph','type'=>'statistics','chart'=>'graph','attributes'=>['data-span'=>'all','data-label'=>language__get($user['language'],'_emailsync_statistics_progress')],'values'=>statistics__format_graph($user['language'],$emailsync['job_graph'],['messages_transferred'=>'_emailsync_statistics_messages_transferred'],['gridLines'=>4,'legend'=>false,'smooth'=>false,'decimals'=>0])];
 			foreach (['messages_transferred','messages_discovered','messages_skipped','runs','errors'] as $emailsync['stat']) {
@@ -247,7 +236,8 @@ foreach (\emailsync\JobStore::list() as $emailsync['job']) {
 		'progress'=>\emailsync\ProgressStore::ratio($emailsync['job']),
 		'actions'=>[
 			'load'=>['action'=>'load','id'=>$emailsync['job']['id'],'form'=>true],
-			'ac'=>['id'=>$emailsync['job']['id'],'action'=>'ac','name'=>$settings['key'].'-'.$emailsync['job']['id'],'checked'=>(int) ($emailsync['job']['active'] ?? 0) === 1,'disabled'=>($emailsync['job']['phase'] ?? '') === 'completed']
+			'ac'=>['id'=>$emailsync['job']['id'],'action'=>'ac','name'=>$settings['key'].'-'.$emailsync['job']['id'],'checked'=>(int) ($emailsync['job']['active'] ?? 0) === 1,'disabled'=>($emailsync['job']['phase'] ?? '') === 'completed'],
+			'delete'=>['id'=>$emailsync['job']['id']]
 		]
 	];
 }

@@ -27,7 +27,7 @@ final class Runner {
 		$destination = \imap\ConnectionStore::credentials((string) ($job['destination_id'] ?? ''));
 		$result = MailboxSync::run($job,$source,$destination);
 		$finished = (int) ($result['finished'] ?? time());
-		Statistics::add($id,$result);
+		Statistics::add($id,$result,max(2,(int) ceil(((int) ($job['quiet_period'] ?? 172800)) / 3600) * 2));
 
 		if (empty($result['success'])) {
 			$firstFailure = (int) ($job['failure_count'] ?? 0) === 0;
