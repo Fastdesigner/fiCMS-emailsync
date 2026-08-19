@@ -250,7 +250,7 @@ foreach ($emailsync['jobs'] as $emailsync['job']) {
 	];
 }
 
-$emailsync['items'][] = ['id'=>$settings['key'].'-new','tag'=>'li','description'=>language__get($user['language'],'_emailsync_new'),'classes'=>['system-next'],'actions'=>['load'=>['action'=>'load','id'=>'new','form'=>true]]];
+if (!empty($emailsync['probe']['available'])) $emailsync['items'][] = ['id'=>$settings['key'].'-new','tag'=>'li','description'=>language__get($user['language'],'_emailsync_new'),'classes'=>['system-next'],'actions'=>['load'=>['action'=>'load','id'=>'new','form'=>true]]];
 $emailsync['sync_list'] = create__list($settings['key'].'-list',$emailsync['items'],['classes'=>['forms__wrapper'],'clear'=>true]);
 
 $emailsync['settings_data'] = [
@@ -266,13 +266,17 @@ $emailsync['settings_inputs'] = [
 	'fallback_ttl_hours'=>['required'=>true,'type'=>'number','attributes'=>['min'=>1,'max'=>168]]
 ];
 $emailsync['settings_formitems'] = create__form_items($emailsync['settings_inputs'],$emailsync['settings_data'],'emailsync',$user['language']);
-$emailsync['settings_items'] = [[
-	'id'=>$settings['key'].'-runtime',
-	'type'=>'form',
-	'classes'=>['forms__item'],
-	'attributes'=>['data-notify'=>$emailsync['probe']['available'] ? 'success' : 'error'],
-	'form'=>['type'=>'input','option'=>'runtime_status','name'=>language__get($user['language'],'_emailsync_runtime_status'),'value'=>language__get($user['language'],$emailsync['probe']['available'] ? '_emailsync_runtime_available' : '_emailsync_runtime_unavailable'),'attributes'=>['disabled'=>true]]
+$emailsync['runtime_state'] = !empty($emailsync['probe']['available']) ? 'available' : 'unavailable';
+$emailsync['runtime_content'] = ['id'=>$settings['key'].'-runtime-content','tag'=>'ul','classes'=>['forms__wrapper'],'items'=>[
+	['id'=>$settings['key'].'-runtime-status','description'=>language__get($user['language'],'_emailsync_runtime_status_'.$emailsync['runtime_state']),'classes'=>['forms__item'],'tag'=>'font'],
+	['id'=>$settings['key'].'-runtime-info','description'=>language__get($user['language'],'_emailsync_runtime_info_'.$emailsync['runtime_state']),'classes'=>['forms__item'],'tag'=>'font']
 ]];
+$emailsync['settings_items'] = [create__dropdown(
+	$settings['key'].'-runtime',
+	language__get($user['language'],'_emailsync_runtime_title'),
+	$emailsync['runtime_content'],
+	['subtitle'=>language__get_parsed($user['language'],'_emailsync_runtime_checked',['value'=>format__date_relative((int) $emailsync['probe']['checked'],'relative',$user['language'],true)]),'attributes'=>['data-details-independent'=>'true']]
+)];
 foreach (['interval_minutes','quiet_hours','monitoring_days','fallback_ttl_hours'] as $emailsync['field']) $emailsync['settings_items'][] = ['id'=>$settings['key'].'-setting-'.$emailsync['field'],'type'=>'form','classes'=>['forms__item'],'form'=>$emailsync['settings_formitems'][$emailsync['field']]];
 $emailsync['settings_items'][] = ['id'=>$settings['key'].'-settings-save','tag'=>'button','classes'=>['system-button'],'attributes'=>['type'=>'button'],'description'=>language__get($user['language'],'_settings_form_save'),'actions'=>['load'=>['action'=>'save_settings']]];
 $emailsync['settings_form'] = ['id'=>$settings['key'].'-settings-form','tag'=>'form','classes'=>['forms__wrapper'],'items'=>$emailsync['settings_items']];

@@ -12,6 +12,7 @@ final class MailboxSync {
 		$available = class_exists(\imap\Client::class) && \imap\Client::available() && function_exists('sodium_crypto_secretbox');
 		return [
 			'available'=>$available ? 1 : 0,
+			'checked'=>(int) ($_SERVER['now'] ?? time()),
 			'version'=>'Pure PHP IMAP/TLS',
 			'error'=>$available ? '' : 'imap_transport_unavailable'
 		];
