@@ -1,0 +1,168 @@
+<?php
+
+namespace emailsync;
+
+use RuntimeException;
+use Throwable;
+
+final class MailboxSync {
+	public static function probe(): array {
+		$available = \imap\Client::available() && function_exists('sodium_crypto_secretbox');
+		return [
+			'available'=>$available ? 1 : 0,
+			'version'=>'Pure PHP IMAP/TLS',
+			'error'=>$available ? '' : 'imap_transport_unavailable'
+		];
+	}
+
+	public static function run(array $job, array $source, array $destination): array {
+		$started = time();
+		$id = preg_replace('/[^a-z0-9_.-]/i','',(string) ($job['id'] ?? ''));
+		$logName = 'runs/'.$id.'/'.date('Ymd-His',$started).'-'.bin2hex(random_bytes(3)).'.log';
+		$result = [
+			'success'=>false,
+			'exit_code'=>1,
+			'error'=>'',
+			'started'=>$started,
+			'finished'=>0,
+			'duration'=>0,
+			'log'=>State::path($logName),
+			'stats'=>self::stats()
+		];
+		$clients = [];
+
+		try {
+			if ($id === '') throw new RuntimeException('job_invalid');
+			$clients = [new \imap\Client($source),new \imap\Client($destination)];
+			foreach ($clients as $client) $client->connect();
+			self::transfer($id,$clients[0],$clients[1],$result['stats']);
+			$result['success'] = true;
+			$result['exit_code'] = 0;
+		} catch (Throwable $exception) {
+			$result['error'] = substr($exception->getMessage() ?: 'imap_sync_failed',0,160);
+			$result['stats']['errors'] = 1;
+		} finally {
+			foreach (array_reverse($clients) as $client) $client->close();
+		}
+
+		$result['finished'] = time();
+		$result['duration'] = max(0,$result['finished'] - $result['started']);
+		self::log($logName,$result);
+		return $result;
+	}
+
+	private static function transfer(string $jobId, \imap\Client $source, \imap\Client $destination, array &$stats): void {
+		$progress = ProgressStore::get($jobId);
+		$sourceFolders = $source->folders();
+		$destinationFolders = $destination->folders();
+		if (!$sourceFolders) throw new RuntimeException('source_folders_missing');
+		$destinationNames = [];
+		foreach ($destinationFolders as $folder) $destinationNames[strtolower((string) $folder['name'])] = (string) $folder['name'];
+		$destinationDelimiter = (string) ($destinationFolders[0]['delimiter'] ?? '/');
+		usort($sourceFolders,fn(array $first, array $second): int => [strcasecmp((string) $first['name'],'INBOX') !== 0,(string) $first['name']] <=> [strcasecmp((string) $second['name'],'INBOX') !== 0,(string) $second['name']]);
+
+		foreach ($sourceFolders as $folder) {
+			$sourceName = (string) $folder['name'];
+			$destinationName = self::destinationName($sourceName,(string) ($folder['delimiter'] ?? '/'),$destinationDelimiter);
+			$destinationKey = strtolower($destinationName);
+			if (!isset($destinationNames[$destinationKey])) {
+				$destination->create($destinationName);
+				$destinationNames[$destinationKey] = $destinationName;
+			}
+
+			$sourceStatus = $source->select($sourceName,true);
+			$stored = ProgressStore::folder($progress,$sourceName);
+			if (!empty($stored['uidvalidity']) && (int) $stored['uidvalidity'] !== $sourceStatus['uidvalidity']) throw new RuntimeException('source_uidvalidity_changed');
+			$lastUid = (int) ($stored['last_uid'] ?? 0);
+			$uids = $source->uidsAfter($lastUid);
+			$stats['messages_source'] += (int) $sourceStatus['exists'];
+			$destinationStatus = $destination->select($destinationNames[$destinationKey]);
+			$stats['messages_destination'] += (int) $destinationStatus['exists'];
+
+			if (!$stored) {
+				$progress = ProgressStore::checkpoint($jobId,$sourceName,(int) $sourceStatus['uidvalidity'],0);
+				$stored = ProgressStore::folder($progress,$sourceName);
+			}
+
+			foreach ($uids as $uid) {
+				$stats['messages_discovered']++;
+				$message = $source->fetch($uid);
+				try {
+					$hash = \imap\Client::hash($message['stream']);
+					$messageId = self::messageId($message['stream']);
+					$candidates = $messageId === '' ? [] : $destination->uidsByHeader('Message-ID',$messageId);
+					if (!$candidates) $candidates = $destination->uidsBySize((int) $message['size']);
+					if (self::exists($destination,$candidates,(int) $message['size'],$hash)) {
+						$stats['messages_skipped']++;
+						$destinationUid = 0;
+					} else {
+						$destinationUid = $destination->append($destinationNames[$destinationKey],$message['stream'],(int) $message['size'],(array) $message['flags'],(string) $message['internaldate']);
+						$stats['messages_transferred']++;
+						$stats['bytes_transferred'] += (int) $message['size'];
+					}
+				} finally {
+					fclose($message['stream']);
+				}
+				$progress = ProgressStore::checkpoint($jobId,$sourceName,(int) $sourceStatus['uidvalidity'],$uid,$destinationUid);
+			}
+			$destination->subscribe($destinationNames[$destinationKey]);
+		}
+	}
+
+	private static function exists(\imap\Client $destination, array $uids, int $size, string $hash): bool {
+		foreach ($uids as $uid) {
+			$candidate = $destination->fetch((int) $uid);
+			try {
+				if ((int) $candidate['size'] === $size && hash_equals($hash,\imap\Client::hash($candidate['stream']))) return true;
+			} finally {
+				fclose($candidate['stream']);
+			}
+		}
+		return false;
+	}
+
+	private static function messageId($stream): string {
+		rewind($stream);
+		$headers = '';
+		while (!feof($stream) && strlen($headers) < 262144) {
+			$line = fgets($stream);
+			if ($line === false || $line === "\r\n" || $line === "\n") break;
+			$headers .= $line;
+		}
+		rewind($stream);
+		$headers = preg_replace("/\r?\n[\t ]+/",' ',$headers);
+		return preg_match('/^Message-ID:\s*(.+)$/im',(string) $headers,$match) ? substr(trim($match[1]),0,998) : '';
+	}
+
+	private static function destinationName(string $source, string $sourceDelimiter, string $destinationDelimiter): string {
+		if (strcasecmp($source,'INBOX') === 0) return 'INBOX';
+		if ($sourceDelimiter === '' || $sourceDelimiter === $destinationDelimiter) return $source;
+		return implode($destinationDelimiter,explode($sourceDelimiter,$source));
+	}
+
+	private static function stats(): array {
+		return [
+			'messages_discovered'=>0,
+			'messages_transferred'=>0,
+			'messages_skipped'=>0,
+			'messages_source'=>0,
+			'messages_destination'=>0,
+			'bytes_transferred'=>0,
+			'errors'=>0
+		];
+	}
+
+	private static function log(string $name, array $result): void {
+		$lines = [
+			'fiCMS Email Sync',
+			'Status: '.(!empty($result['success']) ? 'success' : 'failed'),
+			'Error: '.((string) ($result['error'] ?? '') ?: 'none'),
+			'Duration: '.(int) ($result['duration'] ?? 0),
+			'New source messages: '.(int) ($result['stats']['messages_discovered'] ?? 0),
+			'Messages transferred: '.(int) ($result['stats']['messages_transferred'] ?? 0),
+			'Messages skipped: '.(int) ($result['stats']['messages_skipped'] ?? 0),
+			'Bytes transferred: '.(int) ($result['stats']['bytes_transferred'] ?? 0)
+		];
+		State::write($name,implode(PHP_EOL,$lines).PHP_EOL,true);
+	}
+}

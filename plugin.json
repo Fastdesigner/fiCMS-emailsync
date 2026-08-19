@@ -1,0 +1,13 @@
+{
+  "id": "fiCMS-emailsync",
+  "name": "fiCMS Email Sync",
+  "type": "plugin",
+  "system": false,
+  "description": "Managed pure-PHP IMAP mailbox migrations with MX cutover monitoring and event reports.",
+  "installLocation": "PLUGINPATH/fiCMS-emailsync",
+  "autoload": {
+    "psr4": {
+      "emailsync\\": "src/"
+    }
+  }
+}
