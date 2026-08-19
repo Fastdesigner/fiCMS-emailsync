@@ -13,6 +13,7 @@ final class McpView {
 			'jobs'=>array_values(array_map(fn(array $job): array => self::job($job,false),JobStore::list()))
 		];
 		if ($id === 'jobs') return ['type'=>'emailsync','jobs'=>array_values(array_map(fn(array $job): array => self::job($job,false),JobStore::list()))];
+		if (str_starts_with($id,'folders:')) return self::folders(substr($id,8));
 		if (str_starts_with($id,'job:')) $id = substr($id,4);
 		$id = preg_replace('/[^a-z0-9_.-]/i','',$id);
 		$job = $id !== '' ? JobStore::get($id) : [];
@@ -48,5 +49,23 @@ final class McpView {
 			if (is_string($log)) $view['last_log'] = substr($log,0,20000);
 		}
 		return $view;
+	}
+
+	private static function folders(string $id): array {
+		$id = preg_replace('/[^a-z0-9_.-]/i','',$id);
+		$job = $id !== '' ? JobStore::get($id) : [];
+		if (!$job) return ['error'=>'No email sync job found for '.$id.'.'];
+		$clients = [];
+		try {
+			foreach (['source','destination'] as $side) {
+				$clients[$side] = new \imap\Client(\imap\ConnectionStore::credentials((string) ($job[$side.'_id'] ?? '')));
+				$clients[$side]->connect();
+			}
+			return ['type'=>'emailsync','job_id'=>$id,'source'=>$clients['source']->folders(),'destination'=>$clients['destination']->folders()];
+		} catch (\Throwable $exception) {
+			return ['error'=>substr($exception->getMessage() ?: 'imap_folder_probe_failed',0,160)];
+		} finally {
+			foreach (array_reverse($clients) as $client) $client->close();
+		}
 	}
 }
