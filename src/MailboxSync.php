@@ -85,13 +85,16 @@ final class MailboxSync {
 		$destinationNames = [];
 		foreach ($destinationFolders as $folder) $destinationNames[strtolower((string) $folder['name'])] = (string) $folder['name'];
 		$destinationDelimiter = (string) ($destinationFolders[0]['delimiter'] ?? '/');
+		$destinationPrefix = self::destinationPrefix($destinationFolders,$destinationDelimiter);
+		$destinationSpecial = self::specialFolders($destinationFolders);
 		usort($sourceFolders,fn(array $first, array $second): int => [strcasecmp((string) $first['name'],'INBOX') !== 0,(string) $first['name']] <=> [strcasecmp((string) $second['name'],'INBOX') !== 0,(string) $second['name']]);
 
 		$plan = [];
 		$total = 0;
 		foreach ($sourceFolders as $folder) {
 			$sourceName = (string) $folder['name'];
-			$destinationName = self::destinationName($sourceName,(string) ($folder['delimiter'] ?? '/'),$destinationDelimiter);
+			$destinationName = self::specialDestination((array) ($folder['attributes'] ?? []),$destinationSpecial);
+			if ($destinationName === '') $destinationName = self::destinationName($sourceName,(string) ($folder['delimiter'] ?? '/'),$destinationDelimiter,$destinationPrefix);
 			$sourceStatus = $source->select($sourceName,true);
 			$stored = ProgressStore::folder($progress,$sourceName);
 			if (!empty($stored['uidvalidity']) && (int) $stored['uidvalidity'] !== $sourceStatus['uidvalidity']) throw new RuntimeException('source_uidvalidity_changed');
@@ -175,10 +178,38 @@ final class MailboxSync {
 		return preg_match('/^Message-ID:\s*(.+)$/im',(string) $headers,$match) ? substr(trim($match[1]),0,998) : '';
 	}
 
-	private static function destinationName(string $source, string $sourceDelimiter, string $destinationDelimiter): string {
+	private static function destinationName(string $source, string $sourceDelimiter, string $destinationDelimiter, string $destinationPrefix = ''): string {
 		if (strcasecmp($source,'INBOX') === 0) return 'INBOX';
-		if ($sourceDelimiter === '' || $sourceDelimiter === $destinationDelimiter) return $source;
-		return implode($destinationDelimiter,explode($sourceDelimiter,$source));
+		$name = $sourceDelimiter === '' || $sourceDelimiter === $destinationDelimiter ? $source : implode($destinationDelimiter,explode($sourceDelimiter,$source));
+		return $destinationPrefix !== '' && !str_starts_with(strtolower($name),strtolower($destinationPrefix)) ? $destinationPrefix.$name : $name;
+	}
+
+	private static function destinationPrefix(array $folders, string $delimiter): string {
+		if ($delimiter === '') return '';
+		$prefix = 'INBOX'.$delimiter;
+		$found = false;
+		foreach ($folders as $folder) {
+			$name = (string) ($folder['name'] ?? '');
+			if (strcasecmp($name,'INBOX') === 0) continue;
+			$found = true;
+			if (!str_starts_with(strtolower($name),strtolower($prefix))) return '';
+		}
+		return $found ? $prefix : '';
+	}
+
+	private static function specialFolders(array $folders): array {
+		$special = [];
+		foreach ($folders as $folder) foreach ((array) ($folder['attributes'] ?? []) as $attribute) {
+			$attribute = strtolower((string) $attribute);
+			if (!in_array($attribute,['\\archive','\\drafts','\\junk','\\sent','\\trash'],true) || isset($special[$attribute])) continue;
+			$special[$attribute] = (string) ($folder['name'] ?? '');
+		}
+		return $special;
+	}
+
+	private static function specialDestination(array $attributes, array $special): string {
+		foreach ($attributes as $attribute) if (isset($special[strtolower((string) $attribute)])) return $special[strtolower((string) $attribute)];
+		return '';
 	}
 
 	private static function stats(): array {

@@ -73,7 +73,10 @@ final class ProgressStore {
 		if (($job['phase'] ?? '') === 'completed') return 1;
 		$run = (array) (self::get((string) ($job['id'] ?? ''))['run'] ?? []);
 		$total = max(0,(int) ($run['total'] ?? 0));
-		if ($total > 0) return min(1,max(0,(int) ($run['processed'] ?? 0)) / $total);
+		$processed = max(0,(int) ($run['processed'] ?? 0));
+		$completed = max(0,(int) ($job['stats_total']['messages_discovered'] ?? 0));
+		if ($total > 0 && !empty($run['finished'])) return min(1,$completed / max(1,$completed + max(0,$total - $processed)));
+		if ($total > 0) return min(1,($completed + $processed) / max(1,$completed + $total));
 		if (($job['phase'] ?? '') === 'monitoring' || !empty($run['success'])) return 1;
 		return 0;
 	}
