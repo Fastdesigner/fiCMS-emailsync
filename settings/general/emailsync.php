@@ -184,6 +184,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			$emailsync['dropdown']['mainattributes']['data-emailsync-connection'] = $emailsync['side'];
 			$emailsync['dropdown']['mainattributes']['data-emailsync-job'] = empty($emailsync['job']) ? 'new' : (string) $emailsync['job']['id'];
 			$emailsync['dropdown']['mainattributes']['data-emailsync-has-secret'] = !empty($emailsync[$emailsync['side']]['has_secret']) ? '1' : '0';
+			foreach (['pending','checking','ready','failed'] as $emailsync['message']) $emailsync['dropdown']['mainattributes']['data-emailsync-text-'.$emailsync['message']] = language__get($user['language'],'_emailsync_connection_'.$emailsync['message']);
 			$emailsync['form'][] = $emailsync['dropdown'];
 		}
 		$emailsync['form'] = [['id'=>$settings['key'].'-job-fields','tag'=>'div','classes'=>['forms__wrapper'],'items'=>$emailsync['form']]];
@@ -202,7 +203,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			$emailsync['job_progress'] = \emailsync\ProgressStore::get((string) $emailsync['job']['id']);
 			$emailsync['job_synchronized'] = max(0,(int) ($emailsync['job']['stats_total']['messages_synchronized'] ?? 0),(int) ($emailsync['job_progress']['run']['processed'] ?? 0));
 			$emailsync['job_graph']['series']['messages_synchronized']['value'] = $emailsync['job_synchronized'];
-			$emailsync['job_series'] = \emailsync\Statistics::series((string) $emailsync['job']['id'],$emailsync['job_synchronized'],max(0,(int) ($emailsync['job']['run_count'] ?? 0)),max(2,(int) ceil($emailsync['plugin_settings']['quiet_period'] / 3600) * 2),(int) ($_SERVER['now'] ?? time()));
+			$emailsync['job_series'] = \emailsync\Statistics::series((string) $emailsync['job']['id'],$emailsync['job_synchronized'],max(0,(int) ($emailsync['job']['run_count'] ?? 0)),(int) ($emailsync['job']['created'] ?? 0),(int) ($_SERVER['now'] ?? time()));
 			$emailsync['job_formatter'] = IntlDateFormatter::create($user['language'],IntlDateFormatter::SHORT,IntlDateFormatter::SHORT);
 			foreach ($emailsync['job_series'] as $emailsync['point']) $emailsync['job_graph']['points'][] = ['label'=>$emailsync['job_formatter']->format((int) $emailsync['point']['time']),'data'=>['messages_synchronized'=>(int) $emailsync['point']['value']]];
 			$emailsync['job_statistic_items'] = [];

@@ -13,7 +13,7 @@ final class Statistics {
 		'errors'=>0
 	];
 
-	public static function add(string $jobId, array $result, int $retentionHours = 96): bool {
+	public static function add(string $jobId, array $result): bool {
 		$stats = (array) ($result['stats'] ?? []);
 		$values = [
 			'runs'=>1,
@@ -27,11 +27,6 @@ final class Statistics {
 		$hour = (int) (floor(max(1,(int) ($result['finished'] ?? time())) / 3600) * 3600);
 		$written = true;
 		foreach ($values as $key => $amount) if (!statistics__daily_json_increment(self::file($jobId),$key,self::DEFAULTS,$hour,$amount)) $written = false;
-		$cutoff = $hour - max(2,$retentionHours) * 3600;
-		if (State::update('statistics/'.self::id($jobId).'.json',function(array $statistics) use ($cutoff): array {
-			foreach ((array) ($statistics['data'] ?? []) as $timestamp => $row) if ((int) $timestamp < $cutoff) unset($statistics['data'][$timestamp]);
-			return $statistics;
-		}) === false) $written = false;
 		return $written;
 	}
 
@@ -46,30 +41,40 @@ final class Statistics {
 		return State::delete('statistics/'.self::id($jobId).'.json');
 	}
 
-	public static function series(string $jobId, int $total, int $runs, int $windowHours, int $now = 0): array {
+	public static function series(string $jobId, int $total, int $runs, int $created, int $now = 0, int $maxPoints = 12): array {
 		if ($runs < 1) return [];
-		$windowHours = max(2,$windowHours);
 		$now = $now > 0 ? $now : time();
-		$end = (int) (floor($now / 3600) * 3600);
-		$start = $end - $windowHours * 3600;
-		$step = max(3600,(int) ceil(($end - $start) / 11 / 3600) * 3600);
-		$timestamps = [$start];
-		for ($timestamp = $start + $step; $timestamp < $end; $timestamp += $step) $timestamps[] = $timestamp;
-		if ($end > $start) $timestamps[] = $end;
-		$grouped = [];
-		$windowTotal = 0;
-		foreach (self::get($jobId)['data'] as $timestamp => $row) {
-			$timestamp = (int) $timestamp;
-			if ($timestamp < $start || $timestamp > $now) continue;
+		$start = max(1,min($now,$created > 0 ? $created : $now));
+		$end = max($start + 1,$now);
+		$increments = [];
+		$recorded = 0;
+		$data = self::get($jobId)['data'];
+		ksort($data);
+		foreach ($data as $timestamp => $row) {
+			$timestamp = min($end,max($start + 1,(int) $timestamp));
 			$amount = max(0,(int) ($row['messages_synchronized'] ?? $row['messages_transferred'] ?? 0));
-			$bucket = $timestamps[min(count($timestamps) - 1,(int) floor(($timestamp - $start) / $step))];
-			$grouped[$bucket] = (int) ($grouped[$bucket] ?? 0) + $amount;
-			$windowTotal += $amount;
+			$increments[$timestamp] = (int) ($increments[$timestamp] ?? 0) + $amount;
+			$recorded += $amount;
 		}
+		$recovered = max(0,$total - $recorded);
+		if ($recovered > 0) {
+			$timestamp = count($increments) ? array_key_first($increments) : $end;
+			$increments[$timestamp] = (int) ($increments[$timestamp] ?? 0) + $recovered;
+		}
+		ksort($increments);
+		$maxPoints = max(2,$maxPoints);
+		$pointCount = min($maxPoints,max(2,(int) ceil(($end - $start) / 3600) + 1));
 		$points = [];
-		$cumulative = max(0,$total - $windowTotal);
-		foreach ($timestamps as $timestamp) {
-			$cumulative += (int) ($grouped[$timestamp] ?? 0);
+		$cumulative = 0;
+		$increment = 0;
+		$timestamps = array_keys($increments);
+		for ($index = 0; $index < $pointCount; $index++) {
+			$timestamp = (int) round($start + (($end - $start) * $index / ($pointCount - 1)));
+			while (isset($timestamps[$increment]) && $timestamps[$increment] <= $timestamp) {
+				$cumulative += (int) $increments[$timestamps[$increment]];
+				$increment++;
+			}
+			if ($index === $pointCount - 1) $cumulative = $total;
 			$points[] = ['time'=>$timestamp,'value'=>$cumulative];
 		}
 		return $points;

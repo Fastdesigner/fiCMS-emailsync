@@ -28,7 +28,7 @@ final class Runner {
 		$result = MailboxSync::run($job,$source,$destination);
 		$finished = (int) ($result['finished'] ?? time());
 		$result['synchronized_total'] = max(0,(int) (ProgressStore::get($id)['run']['processed'] ?? 0));
-		Statistics::add($id,$result,max(2,(int) ceil(((int) ($job['quiet_period'] ?? 172800)) / 3600) * 2));
+		Statistics::add($id,$result);
 
 		if (empty($result['success'])) {
 			$firstFailure = (int) ($job['failure_count'] ?? 0) === 0;

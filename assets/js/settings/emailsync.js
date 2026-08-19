@@ -1,5 +1,6 @@
-function emailsync__language(key) {
-	return typeof settings__language_apply === 'function' ? settings__language_apply(key) : key;
+function emailsync__language(dropdown, key) {
+	let name = key.replace('_emailsync_connection_',''), value = dropdown ? dropdown.getAttribute('data-emailsync-text-'+name) : '';
+	return value || (typeof settings__language_apply === 'function' ? settings__language_apply(key) : key);
 }
 
 function emailsync__field_value(field) {
@@ -40,10 +41,10 @@ function emailsync__connection_data(dropdown) {
 
 function emailsync__connection_test(dropdown) {
 	let values = emailsync__connection_data(dropdown);
-	if (!values || !values.complete) return emailsync__connection_state(dropdown,'warning',emailsync__language('_emailsync_connection_pending'));
+	if (!values || !values.complete) return emailsync__connection_state(dropdown,'warning',emailsync__language(dropdown,'_emailsync_connection_pending'));
 	let side = dropdown.getAttribute('data-emailsync-connection'), sequence = parseInt(dropdown.getAttribute('data-emailsync-sequence') || '0') + 1;
 	dropdown.setAttribute('data-emailsync-sequence',String(sequence));
-	emailsync__connection_state(dropdown,'warning',emailsync__language('_emailsync_connection_checking'));
+	emailsync__connection_state(dropdown,'warning',emailsync__language(dropdown,'_emailsync_connection_checking'));
 	let post = new FormData();
 	post.append('settings',true);
 	post.append('type','general-emailsync');
@@ -55,19 +56,19 @@ function emailsync__connection_test(dropdown) {
 		if (parseInt(dropdown.getAttribute('data-emailsync-sequence') || '0') !== sequence) return;
 		let data = fiCMS__json(response), result = data && data.result ? data.result : false;
 		if (result && result.result === true) {
-			let message = emailsync__language('_emailsync_connection_ready').replace('%count%',String(parseInt(result.folders || 0)));
+			let message = emailsync__language(dropdown,'_emailsync_connection_ready').replace('%count%',String(parseInt(result.folders || 0)));
 			emailsync__connection_state(dropdown,'success',message);
 			return;
 		}
 		let error = result && result.error ? String(result.error) : 'imap_connection_failed';
-		emailsync__connection_state(dropdown,'error',emailsync__language('_emailsync_connection_failed').replace('%error%',error));
-	}).catch(() => emailsync__connection_state(dropdown,'error',emailsync__language('_emailsync_connection_failed').replace('%error%','request_failed')));
+		emailsync__connection_state(dropdown,'error',emailsync__language(dropdown,'_emailsync_connection_failed').replace('%error%',error));
+	}).catch(() => emailsync__connection_state(dropdown,'error',emailsync__language(dropdown,'_emailsync_connection_failed').replace('%error%','request_failed')));
 }
 
 function emailsync__connection_schedule(dropdown) {
 	if (!dropdown) return false;
 	if (dropdown._emailsyncTimer) clearTimeout(dropdown._emailsyncTimer);
-	emailsync__connection_state(dropdown,'warning',emailsync__language('_emailsync_connection_pending'));
+	emailsync__connection_state(dropdown,'warning',emailsync__language(dropdown,'_emailsync_connection_pending'));
 	dropdown._emailsyncTimer = setTimeout(emailsync__connection_test,600,dropdown);
 	return true;
 }
