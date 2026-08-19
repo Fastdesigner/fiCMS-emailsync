@@ -3,16 +3,10 @@
 namespace emailsync;
 
 final class DnsMonitor {
-	public static function resolveDomain(string $domain, array $usernames = []): string {
-		$domain = self::domain($domain);
-		if ($domain !== '') return $domain;
-		foreach ($usernames as $username) {
-			$username = trim((string) $username);
-			if (strpos($username,'@') === false) continue;
-			$domain = self::domain(substr($username,strrpos($username,'@') + 1));
-			if ($domain !== '') return $domain;
-		}
-		return '';
+	public static function sourceDomain(string $username): string {
+		$username = trim($username);
+		if (strpos($username,'@') === false) return '';
+		return self::domain(substr($username,strrpos($username,'@') + 1));
 	}
 
 	public static function snapshot(string $domain): array {
@@ -45,34 +39,9 @@ final class DnsMonitor {
 		];
 	}
 
-	public static function cutover(array $baseline, array $current, array $expected = []): bool {
+	public static function cutover(array $baseline, array $current): bool {
 		if (empty($current['fingerprint']) || ($current['fingerprint'] ?? '') === ($baseline['fingerprint'] ?? '')) return false;
-		$expected = self::targets($expected);
-		if (!$expected) return true;
-		$currentTargets = self::targets((array) ($current['targets'] ?? []));
-		foreach ($expected as $target) if (!in_array($target,$currentTargets,true)) return false;
 		return true;
-	}
-
-	public static function parseExpected($value): array {
-		$lines = is_array($value) ? $value : preg_split('/[\r\n,;]+/',(string) $value);
-		$targets = [];
-		foreach ((array) $lines as $line) {
-			$parts = preg_split('/\s+/',trim((string) $line));
-			$target = self::host((string) end($parts));
-			if ($target !== '') $targets[] = $target;
-		}
-		return self::targets($targets);
-	}
-
-	private static function targets(array $targets): array {
-		$result = [];
-		foreach ($targets as $target) {
-			$target = self::host((string) $target);
-			if ($target !== '') $result[$target] = $target;
-		}
-		ksort($result,SORT_NATURAL | SORT_FLAG_CASE);
-		return array_values($result);
 	}
 
 	private static function domain(string $domain): string {

@@ -15,7 +15,7 @@ final class Runner {
 
 		$currentMx = DnsMonitor::snapshot((string) ($job['domain'] ?? ''));
 		if (empty($job['baseline_mx']['fingerprint']) && !empty($currentMx['fingerprint'])) $job['baseline_mx'] = $currentMx;
-		$cutover = DnsMonitor::cutover((array) ($job['baseline_mx'] ?? []),$currentMx,(array) ($job['expected_mx'] ?? []));
+		$cutover = DnsMonitor::cutover((array) ($job['baseline_mx'] ?? []),$currentMx);
 		if ($cutover && empty($job['cutover_detected'])) $job['cutover_detected'] = time();
 		$job['current_mx'] = $currentMx;
 		$job['last_run'] = time();

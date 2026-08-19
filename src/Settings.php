@@ -20,7 +20,6 @@ final class Settings {
 
 	private static function normalize(array $data): array {
 		return [
-			'expected_mx'=>DnsMonitor::parseExpected($data['expected_mx'] ?? []),
 			'interval'=>max(60,(int) ($data['interval'] ?? 3600)),
 			'quiet_period'=>max(3600,(int) ($data['quiet_period'] ?? 172800)),
 			'minimum_monitoring'=>max(86400,(int) ($data['minimum_monitoring'] ?? 604800)),

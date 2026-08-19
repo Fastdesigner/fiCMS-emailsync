@@ -17,7 +17,6 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 
 	if (!isset($_POST['handled']) && $emailsync['action'] == 'save_settings') {
 		$emailsync['plugin_settings'] = \emailsync\Settings::save([
-			'expected_mx'=>$_POST['expected_mx'] ?? '',
 			'interval'=>max(1,(int) ($_POST['interval_minutes'] ?? 60)) * 60,
 			'quiet_period'=>max(1,(int) ($_POST['quiet_hours'] ?? 48)) * 3600,
 			'minimum_monitoring'=>max(1,(int) ($_POST['monitoring_days'] ?? 7)) * 86400,
@@ -64,7 +63,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			];
 			$emailsync['tests'][$emailsync['side']] = \emailsync\MailboxSync::test($emailsync['connections'][$emailsync['side']]);
 		}
-		$emailsync['domain'] = \emailsync\DnsMonitor::resolveDomain((string) ($_POST['domain'] ?? ''),[(string) ($_POST['source_username'] ?? ''),(string) ($_POST['destination_username'] ?? '')]);
+		$emailsync['domain'] = \emailsync\DnsMonitor::sourceDomain((string) ($_POST['source_username'] ?? ''));
 		$emailsync['report_user'] = isset($tables['user']) ? mysqlFetchAssoc("SELECT `id`,`email` FROM ".$tables['user']." WHERE `ac` = 1 AND `email` = '".mysqlEscape(trim((string) ($_POST['report_email'] ?? '')))."' LIMIT 1") : false;
 		$emailsync['valid'] = (
 			trim((string) ($_POST['name'] ?? '')) !== '' &&
@@ -133,7 +132,6 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 		$emailsync['destination'] = !empty($emailsync['job']['destination_id']) ? \imap\ConnectionStore::get((string) $emailsync['job']['destination_id']) : [];
 		$emailsync['data'] = [
 			'name'=>$emailsync['job']['name'] ?? '',
-			'domain'=>$emailsync['job']['domain'] ?? '',
 			'report_email'=>$emailsync['job']['report_email'] ?? ($user['email'] ?? ''),
 			'source_host'=>$emailsync['source']['host'] ?? '',
 			'source_port'=>$emailsync['source']['port'] ?? 993,
@@ -152,12 +150,11 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 		];
 		$emailsync['inputs'] = [
 			'name'=>['required'=>true],
-			'domain'=>['attributes'=>['data-emailsync-domain'=>'true','placeholder'=>language__get($user['language'],'_emailsync_domain_placeholder')]],
 			'report_email'=>['required'=>true,'type'=>'email'],
 			'source_host'=>['required'=>true],
 			'source_port'=>['required'=>true,'type'=>'number','attributes'=>['min'=>1,'max'=>65535]],
 			'source_security'=>['required'=>true,'type'=>'select','options'=>$emailsync['security_options']],
-			'source_username'=>['required'=>true,'attributes'=>['data-emailsync-domain-source'=>'true']],
+			'source_username'=>['required'=>true,'type'=>'email'],
 			'source_password'=>['type'=>'password','required'=>empty($emailsync['source']['has_secret']),'attributes'=>['autocomplete'=>'new-password']],
 			'destination_host'=>['required'=>true],
 			'destination_port'=>['required'=>true,'type'=>'number','attributes'=>['min'=>1,'max'=>65535]],
@@ -167,9 +164,8 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 		];
 		$emailsync['formitems'] = create__form_items($emailsync['inputs'],$emailsync['data'],'emailsync',$user['language']);
 		$emailsync['general_items'] = [];
-		foreach (['name','domain','report_email'] as $emailsync['field']) $emailsync['general_items'][] = ['id'=>$settings['key'].'-'.$emailsync['field'],'type'=>'form','classes'=>['forms__item'],'form'=>$emailsync['formitems'][$emailsync['field']]];
-		$emailsync['general_items'][] = ['id'=>$settings['key'].'-domain-info','tag'=>'font','classes'=>['forms__item'],'description'=>language__get($user['language'],'_emailsync_domain_info')];
-		$emailsync['form'] = [create__list($settings['key'].'-general-fields',$emailsync['general_items'],['classes'=>['forms__wrapper']])];
+		foreach (['name','report_email'] as $emailsync['field']) $emailsync['general_items'][] = ['id'=>$settings['key'].'-'.$emailsync['field'],'type'=>'form','classes'=>['forms__item'],'form'=>$emailsync['formitems'][$emailsync['field']]];
+		$emailsync['form'] = [['id'=>$settings['key'].'-general-fields','tag'=>'div','classes'=>['forms__wrapper'],'items'=>$emailsync['general_items']]];
 		foreach (['source','destination'] as $emailsync['side']) {
 			$emailsync['connection_items'] = [];
 			foreach (['host','port','security','username','password'] as $emailsync['field']) $emailsync['connection_items'][] = ['id'=>$settings['key'].'-'.$emailsync['side'].'-'.$emailsync['field'],'type'=>'form','classes'=>['forms__item'],'form'=>$emailsync['formitems'][$emailsync['side'].'_'.$emailsync['field']]];
@@ -177,7 +173,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			$emailsync['dropdown'] = create__dropdown(
 				$settings['key'].'-'.$emailsync['side'],
 				language__get($user['language'],'_emailsync_tab_'.$emailsync['side']),
-				create__list($settings['key'].'-'.$emailsync['side'].'-fields',$emailsync['connection_items'],['classes'=>['forms__wrapper']]),
+				['id'=>$settings['key'].'-'.$emailsync['side'].'-fields','tag'=>'div','classes'=>['forms__wrapper'],'items'=>$emailsync['connection_items']],
 				['subtitle'=>language__get($user['language'],'_emailsync_connection_pending'),'notify'=>'warning']
 			);
 			$emailsync['dropdown']['attributes']['data-emailsync-connection'] = $emailsync['side'];
@@ -185,7 +181,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			$emailsync['dropdown']['attributes']['data-emailsync-has-secret'] = !empty($emailsync[$emailsync['side']]['has_secret']) ? '1' : '0';
 			$emailsync['form'][] = $emailsync['dropdown'];
 		}
-		$emailsync['form'] = [['id'=>$settings['key'].'-job-fields','classes'=>['forms__wrapper'],'items'=>$emailsync['form']]];
+		$emailsync['form'] = [['id'=>$settings['key'].'-job-fields','tag'=>'div','classes'=>['forms__wrapper'],'items'=>$emailsync['form']]];
 		$emailsync['output']['lists'] = create__form($settings['form'],$emailsync['form'],empty($emailsync['job']) ? language__get($user['language'],'_emailsync_new') : (string) $emailsync['job']['name'],language__get($user['language'],'_settings_form_save'),['load'=>['action'=>'save','id'=>empty($emailsync['job']) ? 'new' : $emailsync['job']['id']]]);
 		$_POST['handled'] = true;
 	}
@@ -239,14 +235,12 @@ $emailsync['items'][] = ['id'=>$settings['key'].'-new','tag'=>'li','description'
 $emailsync['sync_list'] = create__list($settings['key'].'-list',$emailsync['items'],['classes'=>['forms__wrapper'],'clear'=>true,'sort'=>true]);
 
 $emailsync['settings_data'] = [
-	'expected_mx'=>implode(PHP_EOL,(array) $emailsync['plugin_settings']['expected_mx']),
 	'interval_minutes'=>max(1,(int) ($emailsync['plugin_settings']['interval'] / 60)),
 	'quiet_hours'=>max(1,(int) ($emailsync['plugin_settings']['quiet_period'] / 3600)),
 	'monitoring_days'=>max(1,(int) ($emailsync['plugin_settings']['minimum_monitoring'] / 86400)),
 	'fallback_ttl_hours'=>max(1,(int) ($emailsync['plugin_settings']['fallback_ttl'] / 3600))
 ];
 $emailsync['settings_inputs'] = [
-	'expected_mx'=>['type'=>'textarea','attributes'=>['rows'=>4]],
 	'interval_minutes'=>['required'=>true,'type'=>'number','attributes'=>['min'=>1,'max'=>10080]],
 	'quiet_hours'=>['required'=>true,'type'=>'number','attributes'=>['min'=>1,'max'=>720]],
 	'monitoring_days'=>['required'=>true,'type'=>'number','attributes'=>['min'=>1,'max'=>90]],
@@ -255,13 +249,12 @@ $emailsync['settings_inputs'] = [
 $emailsync['settings_formitems'] = create__form_items($emailsync['settings_inputs'],$emailsync['settings_data'],'emailsync',$user['language']);
 $emailsync['settings_items'] = [[
 	'id'=>$settings['key'].'-runtime',
-	'tag'=>'font',
+	'type'=>'form',
 	'classes'=>['forms__item'],
 	'attributes'=>['data-notify'=>$emailsync['probe']['available'] ? 'success' : 'error'],
-	'description'=>language__get($user['language'],$emailsync['probe']['available'] ? '_emailsync_runtime_ready' : '_emailsync_runtime_missing'),
-	'subtitle'=>$emailsync['probe']['available'] ? $emailsync['probe']['version'] : language__get($user['language'],'_emailsync_runtime_missing_info')
+	'form'=>['type'=>'checkbox','option'=>'runtime_available','name'=>language__get($user['language'],$emailsync['probe']['available'] ? '_emailsync_runtime_available' : '_emailsync_runtime_unavailable'),'value'=>$emailsync['probe']['available'] ? 1 : 0,'disabled'=>true]
 ]];
-foreach (['expected_mx','interval_minutes','quiet_hours','monitoring_days','fallback_ttl_hours'] as $emailsync['field']) $emailsync['settings_items'][] = ['id'=>$settings['key'].'-setting-'.$emailsync['field'],'type'=>'form','classes'=>['forms__item'],'form'=>$emailsync['settings_formitems'][$emailsync['field']]];
+foreach (['interval_minutes','quiet_hours','monitoring_days','fallback_ttl_hours'] as $emailsync['field']) $emailsync['settings_items'][] = ['id'=>$settings['key'].'-setting-'.$emailsync['field'],'type'=>'form','classes'=>['forms__item'],'form'=>$emailsync['settings_formitems'][$emailsync['field']]];
 $emailsync['settings_items'][] = ['id'=>$settings['key'].'-settings-save','tag'=>'button','classes'=>['system-button'],'attributes'=>['type'=>'button'],'description'=>language__get($user['language'],'_settings_form_save'),'actions'=>['load'=>['action'=>'save_settings']]];
 $emailsync['settings_form'] = ['id'=>$settings['key'].'-settings-form','tag'=>'form','classes'=>['forms__wrapper'],'items'=>$emailsync['settings_items']];
 

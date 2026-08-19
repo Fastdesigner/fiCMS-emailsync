@@ -27,17 +27,6 @@ function emailsync__connection_state(dropdown, state, message) {
 	return true;
 }
 
-function emailsync__domain_from_username(input) {
-	if (!input) return false;
-	let form = input.closest('form'), domain = form ? form.querySelector('[data-emailsync-domain]') : false;
-	if (!domain || String(domain.value || '').trim() !== '') return false;
-	let username = String(input.value || '').trim(), position = username.lastIndexOf('@');
-	if (position < 1 || position >= username.length - 1) return false;
-	domain.value = username.substring(position + 1).toLowerCase();
-	domain.dispatchEvent(new Event('change',{bubbles:true}));
-	return true;
-}
-
 function emailsync__connection_data(dropdown) {
 	let side = dropdown.getAttribute('data-emailsync-connection') || '', form = dropdown.closest('form'), data = {};
 	if (!form || (side !== 'source' && side !== 'destination')) return false;
@@ -88,11 +77,9 @@ function emailsync__connection_bind(dropdown) {
 	dropdown._emailsyncReady = true;
 	dropdown.querySelectorAll('input,select').forEach(input => {
 		input.addEventListener('input',() => {
-			if (input.hasAttribute('data-emailsync-domain-source')) emailsync__domain_from_username(input);
 			emailsync__connection_schedule(dropdown);
 		});
 		input.addEventListener('change',() => {
-			if (input.hasAttribute('data-emailsync-domain-source')) emailsync__domain_from_username(input);
 			emailsync__connection_schedule(dropdown);
 		});
 	});
