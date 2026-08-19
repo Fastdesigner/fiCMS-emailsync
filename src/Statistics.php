@@ -41,6 +41,30 @@ final class Statistics {
 		return State::delete('statistics/'.self::id($jobId).'.json');
 	}
 
+	public static function synchronized(array $job): int {
+		$progress = ProgressStore::get((string) ($job['id'] ?? ''));
+		return max(0,(int) ($job['stats_total']['messages_synchronized'] ?? 0),(int) ($progress['run']['processed'] ?? 0));
+	}
+
+	public static function daily(array $jobs): array {
+		$days = [];
+		foreach ($jobs as $job) {
+			$recorded = 0;
+			foreach (self::get((string) ($job['id'] ?? ''))['data'] as $timestamp => $row) {
+				$amount = max(0,(int) (array_key_exists('messages_synchronized',$row) ? $row['messages_synchronized'] : ($row['messages_transferred'] ?? 0)));
+				$day = strtotime('today',(int) $timestamp);
+				$days[$day] = (int) ($days[$day] ?? 0) + $amount;
+				$recorded += $amount;
+			}
+			$recovered = max(0,self::synchronized($job) - $recorded);
+			if ($recovered < 1) continue;
+			$day = strtotime('today',max(1,(int) ($job['created'] ?? time())));
+			$days[$day] = (int) ($days[$day] ?? 0) + $recovered;
+		}
+		ksort($days);
+		return $days;
+	}
+
 	public static function series(string $jobId, int $total, int $runs, int $created, int $now = 0, int $maxPoints = 12): array {
 		if ($runs < 1) return [];
 		$now = $now > 0 ? $now : time();

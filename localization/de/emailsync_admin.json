@@ -72,6 +72,7 @@
   "_emailsync_statistics_failed": "Fehlgeschlagen",
   "_emailsync_statistics_runs": "Läufe",
   "_emailsync_statistics_progress": "E-Mails gesamt",
+  "_emailsync_statistics_daily": "Synchronisierte E-Mails pro Tag",
   "_emailsync_statistics_messages_synchronized": "Synchronisiert",
   "_emailsync_statistics_messages_transferred": "Übertragen",
   "_emailsync_statistics_messages_discovered": "Neu gefunden",
