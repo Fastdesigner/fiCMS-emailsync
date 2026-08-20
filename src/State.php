@@ -15,15 +15,11 @@ final class State {
 	}
 
 	public static function update(string $name, callable $update): array|false {
-		$result = \ficms\Files::updateJson(self::path($name),$update,true);
-		if ($result !== false) @chmod(self::path($name),0600);
-		return $result;
+		return \ficms\Files::updateJson(self::path($name),$update,true);
 	}
 
 	public static function write(string $name, $content, bool $secure = false): bool {
-		$result = \ficms\Files::writeContent(self::path($name),$content,true,$secure);
-		if ($result && $secure) @chmod(self::path($name),0600);
-		return $result;
+		return \ficms\Files::writeContent(self::path($name),$content,true,$secure);
 	}
 
 	public static function delete(string $name, bool $cleanup = true): bool {

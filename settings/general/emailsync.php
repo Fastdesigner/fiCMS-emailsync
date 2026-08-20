@@ -135,6 +135,10 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 		$emailsync['job'] = $emailsync['id'] !== '' && $emailsync['id'] !== 'new' ? \emailsync\JobStore::get($emailsync['id']) : [];
 		$emailsync['source'] = !empty($emailsync['job']['source_id']) ? \imap\ConnectionStore::get((string) $emailsync['job']['source_id']) : [];
 		$emailsync['destination'] = !empty($emailsync['job']['destination_id']) ? \imap\ConnectionStore::get((string) $emailsync['job']['destination_id']) : [];
+		$emailsync['credentials'] = [
+			'source'=>!empty($emailsync['job']['source_id']) ? \imap\ConnectionStore::credentials((string) $emailsync['job']['source_id']) : [],
+			'destination'=>!empty($emailsync['job']['destination_id']) ? \imap\ConnectionStore::credentials((string) $emailsync['job']['destination_id']) : []
+		];
 		$emailsync['data'] = [
 			'name'=>$emailsync['job']['name'] ?? '',
 			'report_email'=>$emailsync['job']['report_email'] ?? ($user['email'] ?? ''),
@@ -142,12 +146,12 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			'source_port'=>$emailsync['source']['port'] ?? 993,
 			'source_security'=>$emailsync['source']['security'] ?? 'ssl',
 			'source_username'=>$emailsync['source']['username'] ?? '',
-			'source_password'=>'',
+			'source_password'=>$emailsync['credentials']['source']['password'] ?? '',
 			'destination_host'=>$emailsync['destination']['host'] ?? '',
 			'destination_port'=>$emailsync['destination']['port'] ?? 993,
 			'destination_security'=>$emailsync['destination']['security'] ?? 'ssl',
 			'destination_username'=>$emailsync['destination']['username'] ?? '',
-			'destination_password'=>''
+			'destination_password'=>$emailsync['credentials']['destination']['password'] ?? ''
 		];
 		$emailsync['security_options'] = [
 			['option'=>'ssl','name'=>'IMAPS (SSL/TLS)','value'=>'ssl'],
