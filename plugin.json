@@ -9,5 +9,8 @@
     "psr4": {
       "emailsync\\": "src/"
     }
-  }
+  },
+  "requires": [
+    "imap\\ConnectionStore::purgeSecret"
+  ]
 }
