@@ -11,6 +11,9 @@
     }
   },
   "requires": [
-    "imap\\ConnectionStore::purgeSecret"
+    "imap\\ConnectionStore::purgeSecret",
+    "ficms\\Runtime::check",
+    "ficms\\Runtime::load",
+    "ficms\\Runtime::loadCheck"
   ]
 }

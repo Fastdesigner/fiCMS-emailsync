@@ -29,7 +29,7 @@ $emailsync_mcp['job'] = \emailsync\JobStore::update($emailsync_mcp['id'],functio
 	if (!empty($emailsync_mcp['data']['run_next_cron']) && ($job['phase'] ?? '') !== 'completed') {
 		$job['active'] = 1;
 		$job['next_run'] = 0;
-		helper__system_runtime('emailsync_worker',(int) ($_SERVER['now'] ?? time()),true,'seconds');
+		\ficms\Runtime::check('emailsync_worker',(int) ($_SERVER['now'] ?? time()),true,'seconds');
 	}
 	if (($emailsync_mcp['data']['cutover'] ?? '') === 'confirm' && ($job['phase'] ?? '') === 'monitoring') $job['cutover_detected'] = (int) ($_SERVER['now'] ?? time());
 	if (($emailsync_mcp['data']['cutover'] ?? '') === 'reset' && ($job['phase'] ?? '') === 'monitoring') {
