@@ -112,7 +112,7 @@ final class MailboxSync {
 		ProgressStore::plan($jobId,$stats['messages_source'],$processed);
 
 		$sliceProcessed = 0;
-		helper__system_load('emailsync_transfer');
+		\ficms\Runtime::load('emailsync_transfer');
 		foreach ($plan as $folder) {
 			$sourceName = $folder['source'];
 			$destinationName = $folder['destination'];
@@ -134,7 +134,7 @@ final class MailboxSync {
 			}
 
 			foreach ($uids as $uid) {
-				if ($sliceProcessed > 0 && !helper__system_load_check('emailsync_transfer',self::SLICE_SECONDS)) return false;
+				if ($sliceProcessed > 0 && !\ficms\Runtime::loadCheck('emailsync_transfer',self::SLICE_SECONDS)) return false;
 				$stats['messages_discovered']++;
 				$message = $source->fetch($uid);
 				try {

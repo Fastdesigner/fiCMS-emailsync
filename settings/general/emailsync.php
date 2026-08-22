@@ -107,7 +107,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			if ($job['active'] === 1) $job['next_run'] = 0;
 			return $job;
 		});
-		if ((int) ($emailsync['job']['active'] ?? 0) === 1) helper__system_runtime('emailsync_worker',(int) ($_SERVER['now'] ?? time()),true,'seconds');
+		if ((int) ($emailsync['job']['active'] ?? 0) === 1) \ficms\Runtime::check('emailsync_worker',(int) ($_SERVER['now'] ?? time()),true,'seconds');
 		$emailsync['output']['result'] = ['result'=>!empty($emailsync['job'])];
 		$_POST['handled'] = true;
 	}
