@@ -1,13 +1,11 @@
 function emailsync__language(dropdown, key) {
-	let name = key.replace('_emailsync_connection_',''), value = dropdown ? dropdown.getAttribute('data-emailsync-text-'+name) : '';
-	return value || (typeof settings__language_apply === 'function' ? settings__language_apply(key) : key);
+	return dropdown.getAttribute('data-emailsync-text-'+key.replace('_emailsync_connection_','')) || settings__language_apply(key);
 }
 
 function emailsync__field_value(field) {
 	if (!field) return '';
-	if (typeof forms__read_input !== 'function') return field.value || '';
-	let value = forms__read_input(field);
-	return value ? String(value.value || '') : '';
+	let described = fiCMS.forms.describe(field);
+	return described ? String(described.value ?? '') : '';
 }
 
 function emailsync__connection_state(dropdown, state, message) {
@@ -16,14 +14,13 @@ function emailsync__connection_state(dropdown, state, message) {
 	let summary = dropdown.querySelector(':scope > summary'), status = dropdown.querySelector('[data-emailsync-connection-status]');
 	if (summary) {
 		summary.setAttribute('data-notify',state);
-		let icon = summary.querySelector('[data-systemicon]');
+		let icon = summary.querySelector('[data-systemicon]'), subtitle = summary.querySelector('font [data-description]');
 		if (icon) icon.setAttribute('data-systemicon',state);
-		let subtitle = summary.querySelector('font');
 		if (subtitle) subtitle.textContent = message;
 	}
 	if (status) {
 		status.setAttribute('data-notify',state);
-		status.textContent = message;
+		status.querySelector('[data-description]').textContent = message;
 	}
 	return true;
 }
