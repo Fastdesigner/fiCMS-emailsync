@@ -6,11 +6,12 @@
   "description": "Managed pure-PHP IMAP mailbox migrations with MX cutover monitoring and event reports.",
   "installLocation": "PLUGINPATH/fiCMS-emailsync",
   "autoload": {
-    "psr4": {
+    "psr-4": {
       "emailsync\\": "src/"
     }
   },
   "requires": [
+    "ficms\\Ui\\Node::dialog",
     "imap\\ConnectionStore::purgeSecret",
     "ficms\\Runtime::check",
     "ficms\\Runtime::load",
