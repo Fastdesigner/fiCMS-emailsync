@@ -34,7 +34,7 @@
   "_emailsync_connection_failed": "Conexión fallida · %error%",
   "_emailsync_draft_info": "Sin contraseñas se guarda un borrador. Permanece inactivo hasta que, al activarlo, ambas conexiones se verifiquen correctamente.",
   "_emailsync_change_info": "Al cambiar los datos de conexión, la sincronización se detiene. Después hay que volver a activarla con el interruptor.",
-  "_emailsync_activation_failed": "No se puede activar · %error%",
+  "_emailsync_activation_failed": "No se puede activar",
   "_emailsync_runtime_title": "Acceso al buzón",
   "_emailsync_runtime_checked": "Última comprobación: %value%",
   "_emailsync_runtime_status_available": "La sincronización de buzones es posible",

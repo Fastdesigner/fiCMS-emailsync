@@ -56,6 +56,8 @@ namespace {
  \emailsync\JobConfiguration::save(['name'=>'Renamed fixture'],$id);
  check(\emailsync\JobStore::get($id)['active']===1,'renaming does not pause an unchanged connection');
  \emailsync\JobConfiguration::save(['source_password'=>'correct'],$id);
+ check(\emailsync\JobStore::get($id)['active']===1,'resubmitting an unchanged revealed password preserves activation');
+ \emailsync\JobConfiguration::save(['source_password'=>'replacement'],$id);
  check(\emailsync\JobStore::get($id)['phase']==='draft'&&\emailsync\JobStore::get($id)['active']===0,'changing credentials requires explicit reactivation');
  \emailsync\JobStore::update($id,fn($j)=>array_merge($j,['run_count'=>1,'phase'=>'monitoring','active'=>1]));
  check(!\emailsync\JobConfiguration::save(['source_username'=>'other@example.invalid'],$id)['result'],'source identity cannot change after a run');
@@ -75,6 +77,12 @@ namespace {
  $testsBefore=count(\emailsync\MailboxSync::$tests);
  $probe=\emailsync\JobConfiguration::testConnection(['source_host'=>'attacker.example.invalid','source_port'=>993,'source_security'=>'ssl','source_username'=>'source@example.invalid'],$id,'source');
  check(!$probe['result']&&count(\emailsync\MailboxSync::$tests)===$testsBefore,'direct connection probes never forward a saved password to a changed host');
+ $revealed=\imap\ConnectionStore::credentials(\emailsync\JobStore::get($id)['source_id'])['password'];
+ $probe=\emailsync\JobConfiguration::testConnection(['source_host'=>'attacker.example.invalid','source_port'=>993,'source_security'=>'ssl','source_username'=>'source@example.invalid','source_password'=>$revealed],$id,'source');
+ check(!$probe['result']&&count(\emailsync\MailboxSync::$tests)===$testsBefore,'revealed original passwords cannot be auto-tested against an edited host');
+ $guarded=\emailsync\JobConfiguration::save($data+['source_password'=>'correct']);
+ \emailsync\JobConfiguration::save(['source_host'=>'edited.example.invalid','source_password'=>'correct'],$guarded['id']);
+ check(!\imap\ConnectionStore::get(\emailsync\JobStore::get($guarded['id'])['source_id'])['has_secret'],'saving an edited identity never implicitly carries its revealed original password');
  $ready=\emailsync\JobConfiguration::save($data+['source_password'=>'correct','destination_password'=>'correct']);
  $raceId=$ready['id'];
  \emailsync\MailboxSync::$onTest=fn()=>\emailsync\JobConfiguration::save(['source_host'=>'changed.example.invalid','source_password'=>'wrong'],$raceId);

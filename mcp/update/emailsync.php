@@ -3,8 +3,8 @@
 if (!$site['onsite']) return false;
 
 if ($context->mode === 'describe') return [
-	'purpose'=>'Controls an existing email-sync job after reading it. It can activate or pause the job, schedule it for the next cron, and confirm or reset the observed MX cutover.',
-	'args'=>['id'=>'Email-sync job id, or "settings".','data'=>'For a job: active (0 or 1), run_next_cron (true), cutover ("confirm" or "reset"). For settings: interval_minutes, quiet_hours, monitoring_days, fallback_ttl_hours.'],
+	'purpose'=>'Edits an existing email-sync configuration or controls its runtime after get with view edit. Configuration changes never start a transfer; changed connections pause the job. Stored passwords are retained when omitted or blank, and never returned.',
+	'args'=>['id'=>'Email-sync job id, or "settings".','data'=>'Job configuration: any subset of name, report_email, source_host/port/security/username/password and destination_host/port/security/username/password. Separately, one runtime command: active (0 or 1), run_next_cron (true), cutover (confirm or reset), or test_connection (source or destination; tests only the stored connection, never copies mail). Do not mix configuration and commands. For settings: interval_minutes, quiet_hours, monitoring_days, fallback_ttl_hours.'],
 	'scope'=>['admin']
 ];
 
@@ -19,6 +19,21 @@ if ($emailsync_mcp['id'] === 'settings') {
 	return $emailsync_mcp['settings'] ? ['type'=>'emailsync','settings'=>$emailsync_mcp['settings']] : ['error'=>'Email-sync settings could not be saved.'];
 }
 if ($emailsync_mcp['id'] === '' || !\emailsync\JobStore::get($emailsync_mcp['id'])) return ['error'=>'Email-sync job not found.'];
+$emailsync_mcp['configuration'] = array_intersect_key($emailsync_mcp['data'],array_flip(\emailsync\JobConfiguration::fields()));
+$emailsync_mcp['commands'] = array_intersect_key($emailsync_mcp['data'],array_flip(['active','run_next_cron','cutover','test_connection']));
+if (count($emailsync_mcp['configuration']) + count($emailsync_mcp['commands']) !== count($emailsync_mcp['data'])) return ['error'=>'unknown_configuration_field'];
+if (($emailsync_mcp['configuration'] && $emailsync_mcp['commands']) || count($emailsync_mcp['commands']) > 1) return ['error'=>'send_configuration_and_one_runtime_command_separately'];
+if ($emailsync_mcp['configuration']) {
+	$emailsync_mcp['saved'] = \emailsync\JobConfiguration::save($emailsync_mcp['configuration'],$emailsync_mcp['id']);
+	return empty($emailsync_mcp['saved']['result']) ? $emailsync_mcp['saved'] : \emailsync\McpView::read($emailsync_mcp['id']);
+}
+if (isset($emailsync_mcp['data']['test_connection'])) {
+	if (!in_array($emailsync_mcp['data']['test_connection'],['source','destination'],true)) return ['error'=>'invalid_connection_side'];
+	$emailsync_mcp['edit'] = \emailsync\McpView::read($emailsync_mcp['id'],true)['edit'];
+	return \emailsync\JobConfiguration::testConnection($emailsync_mcp['edit'],$emailsync_mcp['id'],$emailsync_mcp['data']['test_connection']);
+}
+if (array_key_exists('active',$emailsync_mcp['data']) && !in_array($emailsync_mcp['data']['active'],[0,1],true)) return ['error'=>'active_must_be_0_or_1'];
+if (array_key_exists('run_next_cron',$emailsync_mcp['data']) && !is_bool($emailsync_mcp['data']['run_next_cron'])) return ['error'=>'run_next_cron_must_be_boolean'];
 if (isset($emailsync_mcp['data']['cutover']) && !in_array($emailsync_mcp['data']['cutover'],['confirm','reset'],true)) return ['error'=>'cutover must be confirm or reset.'];
 
 if (array_key_exists('active',$emailsync_mcp['data']) || !empty($emailsync_mcp['data']['run_next_cron'])) {

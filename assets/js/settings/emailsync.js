@@ -33,7 +33,15 @@ function emailsync__connection_data(dropdown) {
 		data[field] = emailsync__field_value(input);
 	});
 	// Das gespeicherte Passwort gilt nur für die unveränderte Verbindung; eine geänderte braucht ein neues.
-	let stored = dropdown.getAttribute('data-emailsync-has-secret') === '1' && dropdown._emailsyncInitial === ['host','port','security','username'].map(field => data[field].trim()).join('\n');
+	let identity = ['host','port','security','username'].map(field => data[field].trim()).join('\n'), stored = dropdown.getAttribute('data-emailsync-has-secret') === '1' && dropdown._emailsyncInitial === identity;
+	// Das angezeigte Originalpasswort wandert nicht zu einem anderen Server oder Benutzer mit: das Feld wird leer.
+	if (typeof dropdown._emailsyncInitial === 'string' && !stored && dropdown._emailsyncSecret) {
+		if (data.password === dropdown._emailsyncSecret) {
+			fiCMS.forms.write(form.querySelector('[name="'+side+'_password"]'),'');
+			data.password = '';
+		}
+		dropdown._emailsyncSecret = '';
+	}
 	data.complete = data.host.trim() !== '' && data.port.trim() !== '' && data.security.trim() !== '' && data.username.trim() !== '' && (data.password.trim() !== '' || stored);
 	return data;
 }
@@ -67,6 +75,7 @@ function emailsync__connection_test(dropdown) {
 function emailsync__connection_schedule(dropdown) {
 	if (!dropdown) return false;
 	if (dropdown._emailsyncTimer) clearTimeout(dropdown._emailsyncTimer);
+	emailsync__connection_data(dropdown);
 	emailsync__connection_state(dropdown,'warning',emailsync__language(dropdown,'_emailsync_connection_pending'));
 	dropdown._emailsyncTimer = setTimeout(emailsync__connection_test,600,dropdown);
 	return true;
@@ -77,6 +86,7 @@ function emailsync__connection_bind(dropdown) {
 	dropdown._emailsyncReady = true;
 	let initial = emailsync__connection_data(dropdown);
 	dropdown._emailsyncInitial = initial ? ['host','port','security','username'].map(field => initial[field].trim()).join('\n') : '';
+	dropdown._emailsyncSecret = initial ? initial.password : '';
 	dropdown.querySelectorAll('input,select').forEach(input => {
 		input.addEventListener('input',() => {
 			emailsync__connection_schedule(dropdown);

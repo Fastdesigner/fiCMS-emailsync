@@ -11,6 +11,8 @@
     }
   },
   "requires": [
+    "mcp\\Context::edits",
+    "imap\\ConnectionStore::credentials",
     "ficms\\Ui\\Node::dialog",
     "imap\\ConnectionStore::purgeSecret",
     "ficms\\Runtime::check",

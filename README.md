@@ -32,6 +32,21 @@ Beim Abschluss werden beide für die Migration gespeicherten Passwörter entfern
 
 Passwörter werden zentral durch `imap\Vault` verschlüsselt und nur im laufenden PHP-Prozess entschlüsselt. Es entstehen weder Passwortdateien noch Prozesse oder Shell-Kommandos. TLS-Zertifikate der beiden Mailserver werden geprüft.
 
+Im geschützten Einstellungsformular können berechtigte Administratoren gespeicherte Passwörter
+über das normale Passwortfeld einblenden. MCP-Leseantworten enthalten ausschließlich
+Verbindungsmetadaten und `has_secret`, niemals das Passwort.
+
+## MCP-Typ `emailsync`
+
+Die regulären Typ-Handler `get`, `create`, `update` und `delete` werden aus `mcp/` entdeckt
+und sind ausschließlich für Administratoren verfügbar. `create` legt immer einen inaktiven
+Entwurf an; Bezeichnung, Report-Empfänger und Quelladresse genügen. Vor einem `update` wird
+der Job mit `get(type:"emailsync",id:"<id>",data:{view:"edit"})` geladen. Das liefert die
+beschreibbaren Konfigurationsfelder; ausgelassene oder leere Passwörter bleiben bei identischer
+Verbindung gespeichert. Konfiguration und Laufbefehle sind getrennte Aufrufe. Mit
+`update(...,data:{test_connection:"destination"})` wird nur das vorhandene Ziel geprüft;
+das startet keinen Kopierlauf. `active:1` prüft weiterhin beide Verbindungen.
+
 Der Transfer ist additiv und löscht weder Nachrichten noch Ordner. Nachrichten werden als unveränderte MIME-Rohdaten samt Empfangsdatum und den Flags `Seen`, `Answered`, `Flagged` und `Draft` übertragen. Der Fortschritt wird pro Ordner nach jeder Nachricht über Quell-UID und UIDVALIDITY gespeichert. Bei einem abgebrochenen Lauf wird daran angeknüpft; vor dem erneuten Anhängen prüft das Add-on mögliche Zielnachrichten anhand ihres SHA-256-Inhalts-Hashs.
 
 ## Zuständigkeiten

@@ -3,7 +3,7 @@
 namespace emailsync;
 
 final class McpView {
-	public static function read(string $id): array {
+	public static function read(string $id, bool $edit = false): array {
 		$id = trim($id);
 		if ($id === '' || $id === 'summary') return [
 			'type'=>'emailsync',
@@ -12,13 +12,27 @@ final class McpView {
 			'statistics'=>JobStore::statistics(),
 			'jobs'=>array_values(array_map(fn(array $job): array => self::job($job,false),JobStore::list()))
 		];
-		if ($id === 'settings') return ['type'=>'emailsync','settings'=>Settings::get()];
+		if ($id === 'settings') {
+			$result = ['type'=>'emailsync','id'=>'settings','settings'=>Settings::get()];
+			if ($edit) foreach (['interval_minutes'=>['interval',60],'quiet_hours'=>['quiet_period',3600],'monitoring_days'=>['minimum_monitoring',86400],'fallback_ttl_hours'=>['fallback_ttl',3600]] as $field => $mapping) $result['edit'][$field] = $result['settings'][$mapping[0]] / $mapping[1];
+			return $result;
+		}
 		if ($id === 'jobs') return ['type'=>'emailsync','jobs'=>array_values(array_map(fn(array $job): array => self::job($job,false),JobStore::list()))];
 		if (str_starts_with($id,'folders:')) return self::folders(substr($id,8));
 		if (str_starts_with($id,'job:')) $id = substr($id,4);
 		$id = preg_replace('/[^a-z0-9_.-]/i','',$id);
 		$job = $id !== '' ? JobStore::get($id) : [];
-		return $job ? ['type'=>'emailsync','job'=>self::job($job,true)] : ['error'=>'No email sync job found for '.$id.'.'];
+		if (!$job) return ['error'=>'No email sync job found for '.$id.'.'];
+		$result = ['type'=>'emailsync','id'=>$id,'job'=>self::job($job,true)];
+		if ($edit) {
+			$result['edit'] = ['name'=>$job['name'],'report_email'=>$job['report_email']];
+			foreach (['source','destination'] as $side) {
+				$connection = \imap\ConnectionStore::get((string) ($job[$side.'_id'] ?? ''));
+				foreach (['host'=>'','port'=>993,'security'=>'ssl','username'=>'','password'=>''] as $field => $default) $result['edit'][$side.'_'.$field] = $field === 'password' ? '' : ($connection[$field] ?? $default);
+			}
+			$result['controls'] = ['active'=>(int) $job['active'],'run_next_cron'=>false,'cutover'=>['confirm','reset'],'test_connection'=>['source','destination']];
+		}
+		return $result;
 	}
 
 	private static function job(array $job, bool $details): array {

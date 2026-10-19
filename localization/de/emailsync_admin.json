@@ -34,7 +34,7 @@
   "_emailsync_connection_failed": "Verbindung fehlgeschlagen · %error%",
   "_emailsync_draft_info": "Ohne Passwörter wird ein Entwurf gespeichert. Er bleibt inaktiv, bis beim Aktivieren beide Verbindungen erfolgreich geprüft sind.",
   "_emailsync_change_info": "Geänderte Verbindungsdaten halten die Synchronisierung an. Danach muss sie über den Schalter erneut aktiviert werden.",
-  "_emailsync_activation_failed": "Aktivierung nicht möglich · %error%",
+  "_emailsync_activation_failed": "Aktivierung nicht möglich",
   "_emailsync_runtime_title": "Postfachzugriff",
   "_emailsync_runtime_checked": "Zuletzt geprüft: %value%",
   "_emailsync_runtime_status_available": "Postfach-Synchronisierung möglich",

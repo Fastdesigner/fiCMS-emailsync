@@ -3,6 +3,12 @@
 namespace emailsync;
 
 final class JobConfiguration {
+	public static function fields(): array {
+		$fields = ['name','report_email'];
+		foreach (['source','destination'] as $side) foreach (['host','port','security','username','password'] as $field) $fields[] = $side.'_'.$field;
+		return $fields;
+	}
+
 	public static function testConnection(array $data, string $id, string $side): array {
 		if (!in_array($side,['source','destination'],true)) return ['result'=>false,'error'=>'invalid_configuration'];
 		$job = $id !== '' && $id !== 'new' ? JobStore::get($id) : [];
@@ -10,6 +16,9 @@ final class JobConfiguration {
 		$connection = [];
 		foreach (['host'=>'','port'=>993,'security'=>'ssl','username'=>''] as $field => $default) $connection[$field] = $data[$side.'_'.$field] ?? $default;
 		$connection['password'] = (string) ($data[$side.'_password'] ?? '');
+		$identityChanged = false;
+		foreach (['host','port','security','username'] as $field) if ((string) ($stored[$field] ?? '') !== (string) $connection[$field]) $identityChanged = true;
+		if ($identityChanged && $connection['password'] !== '' && hash_equals((string) (\imap\ConnectionStore::credentials((string) ($stored['id'] ?? ''))['password'] ?? ''),$connection['password'])) return ['result'=>false,'error'=>'imap_credentials_missing'];
 		if ($connection['password'] === '') {
 			foreach (['host','port','security','username'] as $field) if ((string) ($stored[$field] ?? '') !== (string) $connection[$field]) return ['result'=>false,'error'=>'imap_credentials_missing'];
 			$connection['password'] = (string) (\imap\ConnectionStore::credentials((string) ($stored['id'] ?? ''))['password'] ?? '');
@@ -48,6 +57,8 @@ final class JobConfiguration {
 			foreach (['host','port','security','username'] as $field) if ((string) ($stored[$field] ?? '') !== (string) $connection[$field]) $identityChanged = true;
 			if ($identityChanged && (int) ($current['run_count'] ?? 0) > 0) return ['result'=>false,'error'=>'mailbox_identity_locked'];
 			$password = (string) ($data[$side.'_password'] ?? '');
+			// A revealed value resubmitted unchanged is never a new credential, even after editing the server.
+			if ($password !== '' && hash_equals((string) (\imap\ConnectionStore::credentials((string) ($stored['id'] ?? ''))['password'] ?? ''),$password)) $password = '';
 			if ($identityChanged || $password !== '') $connection['id'] = '';
 			$changed = $changed || $identityChanged || $password !== '';
 			$connections[$side] = ['metadata'=>$connection,'password'=>$password,'stored'=>$stored];

@@ -34,7 +34,7 @@
   "_emailsync_connection_failed": "Connessione non riuscita · %error%",
   "_emailsync_draft_info": "Senza password viene salvata una bozza. Resta inattiva finché, all'attivazione, entrambe le connessioni non vengono verificate con successo.",
   "_emailsync_change_info": "Modificando i dati di connessione la sincronizzazione si ferma. In seguito va riattivata con l'interruttore.",
-  "_emailsync_activation_failed": "Attivazione non possibile · %error%",
+  "_emailsync_activation_failed": "Attivazione non possibile",
   "_emailsync_runtime_title": "Accesso alla casella",
   "_emailsync_runtime_checked": "Ultimo controllo: %value%",
   "_emailsync_runtime_status_available": "La sincronizzazione delle caselle è possibile",

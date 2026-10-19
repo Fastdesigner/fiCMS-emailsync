@@ -34,7 +34,7 @@
   "_emailsync_connection_failed": "Connection failed · %error%",
   "_emailsync_draft_info": "Without passwords, a draft is saved. It stays inactive until both connections are verified successfully on activation.",
   "_emailsync_change_info": "Changing connection details stops the synchronization. Afterwards it has to be activated again using the switch.",
-  "_emailsync_activation_failed": "Activation not possible · %error%",
+  "_emailsync_activation_failed": "Activation not possible",
   "_emailsync_runtime_title": "Mailbox access",
   "_emailsync_runtime_checked": "Last checked: %value%",
   "_emailsync_runtime_status_available": "Mailbox synchronization is possible",
