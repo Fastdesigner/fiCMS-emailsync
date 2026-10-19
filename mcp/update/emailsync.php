@@ -30,7 +30,8 @@ if ($emailsync_mcp['configuration']) {
 if (isset($emailsync_mcp['data']['test_connection'])) {
 	if (!in_array($emailsync_mcp['data']['test_connection'],['source','destination'],true)) return ['error'=>'invalid_connection_side'];
 	$emailsync_mcp['edit'] = \emailsync\McpView::read($emailsync_mcp['id'],true)['edit'];
-	return \emailsync\JobConfiguration::testConnection($emailsync_mcp['edit'],$emailsync_mcp['id'],$emailsync_mcp['data']['test_connection']);
+	$emailsync_mcp['tested'] = \emailsync\JobConfiguration::testConnection($emailsync_mcp['edit'],$emailsync_mcp['id'],$emailsync_mcp['data']['test_connection']);
+	return empty($emailsync_mcp['tested']['result']) ? $emailsync_mcp['tested'] : ['result'=>true,'type'=>'emailsync','id'=>$emailsync_mcp['id'],'status'=>'connection_verified','scope'=>['side'=>$emailsync_mcp['data']['test_connection'],'folders'=>(int) ($emailsync_mcp['tested']['folders'] ?? 0)]];
 }
 if (array_key_exists('active',$emailsync_mcp['data']) && !in_array($emailsync_mcp['data']['active'],[0,1],true)) return ['error'=>'active_must_be_0_or_1'];
 if (array_key_exists('run_next_cron',$emailsync_mcp['data']) && !is_bool($emailsync_mcp['data']['run_next_cron'])) return ['error'=>'run_next_cron_must_be_boolean'];

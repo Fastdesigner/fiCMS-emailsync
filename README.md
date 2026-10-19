@@ -34,7 +34,7 @@ Passwörter werden zentral durch `imap\Vault` verschlüsselt und nur im laufende
 
 Im geschützten Einstellungsformular können berechtigte Administratoren gespeicherte Passwörter
 über das normale Passwortfeld einblenden. MCP-Leseantworten enthalten ausschließlich
-Verbindungsmetadaten und `has_secret`, niemals das Passwort.
+Verbindungsmetadaten und `secret_present`, niemals das Passwort oder rückschreibbare Maskierungswerte.
 
 ## MCP-Typ `emailsync`
 

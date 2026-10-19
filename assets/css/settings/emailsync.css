@@ -1,0 +1,5 @@
+#general-emailsync-list > [data-notify="error"] > font {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}

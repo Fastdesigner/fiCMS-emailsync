@@ -162,7 +162,7 @@ $emailsync['list'] = $emailsync['ui']->tab('synchronizations',['labels'=>'emails
 foreach ($emailsync['jobs'] as $emailsync['job']) {
 	$emailsync['job_progress'] = \emailsync\ProgressStore::summary($emailsync['job']);
 	// Fehler einer Synchronisation (eben abgelehnte Aktivierung oder letzter fehlgeschlagener Lauf) markieren die Zeile
-	// mit einem kurzen Zustand; die Gründe stehen hinter dem Hinweis am Eintrag statt mehrzeilig im Fluss.
+	// mit einem kurzen Zustand; die Gründe stehen im Titel des Eintrags und vollständig im Status-Reiter.
 	$emailsync['item_error'] = $emailsync['activation_error'][(string) $emailsync['job']['id']] ?? [];
 	$emailsync['item_error_text'] = [];
 	$emailsync['item_state'] = ($emailsync['job']['phase'] ?? '') === 'draft' ? '_emailsync_phase_draft' : '';
@@ -181,8 +181,7 @@ foreach ($emailsync['jobs'] as $emailsync['job']) {
 		'label'=>(string) $emailsync['job']['name'],
 		'subtitle'=>htmlspecialchars(($emailsync['item_state'] !== '' ? language__get($user['language'],$emailsync['item_state']).' · ' : '').(string) $emailsync['job']['domain'].($emailsync['job_progress']['total'] > 0 ? ' · '.$emailsync['job_progress']['processed'].' / '.$emailsync['job_progress']['total'].' '.language__get($user['language'],'_emailsync_statistics_emails') : ''),ENT_QUOTES,'UTF-8'),
 		'progress'=>\emailsync\ProgressStore::ratio($emailsync['job']),
-		'hint'=>count($emailsync['item_error_text']) ? implode(' · ',$emailsync['item_error_text']) : null,
-		'attrs'=>count($emailsync['item_error_text']) ? ['data-notify'=>'error'] : [],
+		'attrs'=>count($emailsync['item_error_text']) ? ['data-notify'=>'error','title'=>implode(' · ',$emailsync['item_error_text'])] : [],
 		'load'=>['id'=>$emailsync['job']['id'],'form'=>true],
 		'toggle'=>['id'=>$emailsync['job']['id'],'action'=>'ac','call'=>'emailsync__activation','name'=>$settings['key'].'-'.$emailsync['job']['id'],'checked'=>(int) ($emailsync['job']['active'] ?? 0) === 1,'disabled'=>($emailsync['job']['phase'] ?? '') === 'completed'],
 		'delete'=>['id'=>$emailsync['job']['id']]

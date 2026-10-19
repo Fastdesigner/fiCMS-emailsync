@@ -24,9 +24,9 @@ namespace {
  $created=mcpCall('create',['data'=>$data]);$id=$created['id'];
  check($created['created']&&$created['active']===0&&$created['phase']==='draft'&&count(\emailsync\MailboxSync::$tests)===$tests,'MCP create saves a real inactive configuration without IMAP access');
  $read=mcpCall('get',['id'=>$id,'data'=>['view'=>'edit']]);
- check($read['id']===$id&&$read['edit']['destination_password']===''&&$read['job']['destination']['has_secret']&&!str_contains(json_encode($read),'correct'),'MCP edit exposes exact configuration and presence, never the stored secret');
+ check($read['id']===$id&&!array_key_exists('destination_password',$read['edit'])&&$read['job']['destination']['secret_present']&&in_array('destination_password',$read['write_only'],true)&&!str_contains(json_encode($read),'correct'),'MCP edit exposes exact configuration and presence, never the stored secret or a redacted write-back placeholder');
  $updated=mcpCall('update',['id'=>$id,'data'=>['name'=>'MCP renamed','source_host'=>'imap.example.invalid']]);
- check($updated['job']['name']==='MCP renamed'&&$updated['job']['destination']['has_secret']&&$updated['job']['active']===0,'MCP partial configuration edit retains target credentials and stays inactive');
+ check($updated['job']['name']==='MCP renamed'&&$updated['job']['destination']['secret_present']&&$updated['job']['active']===0,'MCP partial configuration edit retains target credentials and stays inactive');
  $before=\emailsync\JobStore::get($id);
  $mixed=mcpCall('update',['id'=>$id,'data'=>['name'=>'Must not persist','active'=>1]]);
  check(!empty($mixed['error'])&&\emailsync\JobStore::get($id)===$before,'MCP refuses mixed configuration and activation before any write');

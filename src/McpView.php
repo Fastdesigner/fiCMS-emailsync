@@ -28,8 +28,9 @@ final class McpView {
 			$result['edit'] = ['name'=>$job['name'],'report_email'=>$job['report_email']];
 			foreach (['source','destination'] as $side) {
 				$connection = \imap\ConnectionStore::get((string) ($job[$side.'_id'] ?? ''));
-				foreach (['host'=>'','port'=>993,'security'=>'ssl','username'=>'','password'=>''] as $field => $default) $result['edit'][$side.'_'.$field] = $field === 'password' ? '' : ($connection[$field] ?? $default);
+				foreach (['host'=>'','port'=>993,'security'=>'ssl','username'=>''] as $field => $default) $result['edit'][$side.'_'.$field] = $connection[$field] ?? $default;
 			}
+			$result['write_only'] = ['source_password','destination_password'];
 			$result['controls'] = ['active'=>(int) $job['active'],'run_next_cron'=>false,'cutover'=>['confirm','reset'],'test_connection'=>['source','destination']];
 		}
 		return $result;
@@ -54,8 +55,8 @@ final class McpView {
 		];
 		if (!$details) return $view;
 		$view = array_merge($job,$view,[
-			'source'=>!empty($job['source_id']) ? \imap\ConnectionStore::get((string) $job['source_id']) : [],
-			'destination'=>!empty($job['destination_id']) ? \imap\ConnectionStore::get((string) $job['destination_id']) : [],
+			'source'=>self::connection((string) ($job['source_id'] ?? '')),
+			'destination'=>self::connection((string) ($job['destination_id'] ?? '')),
 			'progress_state'=>ProgressStore::get((string) $job['id']),
 			'statistics'=>Statistics::get((string) $job['id'])
 		]);
@@ -65,6 +66,14 @@ final class McpView {
 			if (is_string($log)) $view['last_log'] = substr($log,0,20000);
 		}
 		return $view;
+	}
+
+	private static function connection(string $id): array {
+		$connection = \imap\ConnectionStore::get($id);
+		if (!$connection) return [];
+		$connection['secret_present'] = !empty($connection['has_secret']);
+		unset($connection['has_secret']);
+		return $connection;
 	}
 
 	private static function folders(string $id): array {
