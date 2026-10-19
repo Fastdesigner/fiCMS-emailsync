@@ -157,7 +157,10 @@ foreach ($emailsync['jobs'] as $emailsync['job']) {
 	$emailsync['item_error'] = $emailsync['activation_error'][(string) $emailsync['job']['id']] ?? [];
 	if (!empty($emailsync['item_error'])) {
 		$emailsync['item_error_text'] = [];
-		foreach (['source','destination'] as $emailsync['side']) if (!empty($emailsync['item_error']['connections'][$emailsync['side']])) $emailsync['item_error_text'][] = language__get($user['language'],'_emailsync_tab_'.$emailsync['side']).': '.(string) $emailsync['item_error']['connections'][$emailsync['side']];
+		foreach (['source','destination'] as $emailsync['side']) if (!empty($emailsync['item_error']['connections'][$emailsync['side']])) {
+			$emailsync['side_error'] = (string) $emailsync['item_error']['connections'][$emailsync['side']];
+			$emailsync['item_error_text'][] = language__get($user['language'],'_emailsync_tab_'.$emailsync['side']).': '.($emailsync['side_error'] === 'imap_credentials_missing' ? language__get($user['language'],'_emailsync_connection_pending') : $emailsync['side_error']);
+		}
 		if (!count($emailsync['item_error_text'])) $emailsync['item_error_text'][] = (string) ($emailsync['item_error']['error'] ?? 'invalid_configuration');
 	}
 	$emailsync['list']->item('job-'.$emailsync['job']['id'],[
@@ -166,7 +169,7 @@ foreach ($emailsync['jobs'] as $emailsync['job']) {
 		'progress'=>\emailsync\ProgressStore::ratio($emailsync['job']),
 		'notify'=>!empty($emailsync['item_error']) ? 'error' : null,
 		'load'=>['id'=>$emailsync['job']['id'],'form'=>true],
-		'toggle'=>['id'=>$emailsync['job']['id'],'action'=>'ac','name'=>$settings['key'].'-'.$emailsync['job']['id'],'checked'=>(int) ($emailsync['job']['active'] ?? 0) === 1,'disabled'=>($emailsync['job']['phase'] ?? '') === 'completed'],
+		'toggle'=>['id'=>$emailsync['job']['id'],'action'=>'ac','call'=>'emailsync__activation','name'=>$settings['key'].'-'.$emailsync['job']['id'],'checked'=>(int) ($emailsync['job']['active'] ?? 0) === 1,'disabled'=>($emailsync['job']['phase'] ?? '') === 'completed'],
 		'delete'=>['id'=>$emailsync['job']['id']]
 	]);
 }

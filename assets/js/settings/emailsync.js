@@ -90,3 +90,14 @@ function emailsync__connection_bind(dropdown) {
 }
 
 if (typeof mutations__add === 'function') mutations__add('[data-emailsync-connection]',emailsync__connection_bind);
+
+// Der Umschalter einer Synchronisation spricht denselben Round-Trip wie jeder Umschalter. Ein fokussierter
+// Umschalter behält im Redraw seinen Zustand (sys__action_ac); ohne Fokus übernimmt er den gespeicherten,
+// auch wenn der Server die Aktivierung ablehnt. Wer per Tastatur schaltet, bekommt den Fokus danach zurück.
+function emailsync__activation(input, value) {
+	let keyboard = document.activeElement === input && input.matches(':focus-visible');
+	input.blur();
+	let request = settings__update(input,value);
+	if (keyboard && request && typeof request.then === 'function') request.then(() => { if (input.isConnected) input.focus({preventScroll:true}); });
+	return request;
+}
