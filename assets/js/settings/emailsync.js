@@ -32,7 +32,9 @@ function emailsync__connection_data(dropdown) {
 		let input = form.querySelector('[name="'+side+'_'+field+'"]');
 		data[field] = emailsync__field_value(input);
 	});
-	data.complete = data.host.trim() !== '' && data.port.trim() !== '' && data.security.trim() !== '' && data.username.trim() !== '' && (data.password.trim() !== '' || dropdown.getAttribute('data-emailsync-has-secret') === '1');
+	// Das gespeicherte Passwort gilt nur für die unveränderte Verbindung; eine geänderte braucht ein neues.
+	let stored = dropdown.getAttribute('data-emailsync-has-secret') === '1' && dropdown._emailsyncInitial === ['host','port','security','username'].map(field => data[field].trim()).join('\n');
+	data.complete = data.host.trim() !== '' && data.port.trim() !== '' && data.security.trim() !== '' && data.username.trim() !== '' && (data.password.trim() !== '' || stored);
 	return data;
 }
 
@@ -73,6 +75,8 @@ function emailsync__connection_schedule(dropdown) {
 function emailsync__connection_bind(dropdown) {
 	if (!dropdown || dropdown._emailsyncReady) return false;
 	dropdown._emailsyncReady = true;
+	let initial = emailsync__connection_data(dropdown);
+	dropdown._emailsyncInitial = initial ? ['host','port','security','username'].map(field => initial[field].trim()).join('\n') : '';
 	dropdown.querySelectorAll('input,select').forEach(input => {
 		input.addEventListener('input',() => {
 			emailsync__connection_schedule(dropdown);

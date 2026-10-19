@@ -4,9 +4,7 @@ if (!$site['onsite'] || !isset($settings['key']) || $html['is_superviser'] != 1)
 
 $emailsync = [
 	'output'=>['result'=>[]],
-	'jobs'=>\emailsync\JobStore::list(),
 	'plugin_settings'=>\emailsync\Settings::get(),
-	'statistics'=>\emailsync\JobStore::statistics(),
 	'probe'=>\emailsync\MailboxSync::probe()
 ];
 
@@ -26,88 +24,18 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 	}
 
 	if (!isset($_POST['handled']) && $emailsync['action'] == 'test_connection' && in_array(($_POST['side'] ?? ''),['source','destination'],true)) {
-		$emailsync['side'] = (string) $_POST['side'];
-		$emailsync['job'] = $emailsync['id'] !== '' && $emailsync['id'] !== 'new' ? \emailsync\JobStore::get($emailsync['id']) : [];
-		$emailsync['connection_id'] = (string) ($emailsync['job'][$emailsync['side'].'_id'] ?? '');
-		$emailsync['stored_credentials'] = $emailsync['connection_id'] !== '' ? \imap\ConnectionStore::credentials($emailsync['connection_id']) : [];
-		$emailsync['connection'] = [
-			'host'=>$_POST[$emailsync['side'].'_host'] ?? '',
-			'port'=>$_POST[$emailsync['side'].'_port'] ?? 993,
-			'security'=>$_POST[$emailsync['side'].'_security'] ?? 'ssl',
-			'username'=>$_POST[$emailsync['side'].'_username'] ?? '',
-			'password'=>trim((string) ($_POST[$emailsync['side'].'_password'] ?? '')) !== '' ? (string) $_POST[$emailsync['side'].'_password'] : (string) ($emailsync['stored_credentials']['password'] ?? ''),
-			'auth'=>'password'
-		];
-		$emailsync['output']['result'] = \emailsync\MailboxSync::test($emailsync['connection']) + ['side'=>$emailsync['side']];
+		$emailsync['output']['result'] = \emailsync\JobConfiguration::testConnection($_POST,$emailsync['id'],(string) $_POST['side']) + ['side'=>(string) $_POST['side']];
 		$_POST['handled'] = true;
 	}
 
 	if (!isset($_POST['handled']) && $emailsync['action'] == 'save') {
-		$emailsync['job'] = $emailsync['id'] !== '' && $emailsync['id'] !== 'new' ? \emailsync\JobStore::get($emailsync['id']) : [];
-		$emailsync['connections'] = [];
-		$emailsync['tests'] = [];
-		foreach (['source','destination'] as $emailsync['side']) {
-			$emailsync['stored'] = !empty($emailsync['job'][$emailsync['side'].'_id']) ? \imap\ConnectionStore::get((string) $emailsync['job'][$emailsync['side'].'_id']) : [];
-			$emailsync['stored_credentials'] = !empty($emailsync['stored']['id']) ? \imap\ConnectionStore::credentials((string) $emailsync['stored']['id']) : [];
-			$emailsync['connections'][$emailsync['side']] = [
-				'id'=>$emailsync['stored']['id'] ?? '',
-				'name'=>trim((string) ($_POST['name'] ?? '')).' '.$emailsync['side'],
-				'purpose'=>'migration',
-				'host'=>$_POST[$emailsync['side'].'_host'] ?? '',
-				'port'=>$_POST[$emailsync['side'].'_port'] ?? 993,
-				'security'=>$_POST[$emailsync['side'].'_security'] ?? 'ssl',
-				'username'=>$_POST[$emailsync['side'].'_username'] ?? '',
-				'password'=>trim((string) ($_POST[$emailsync['side'].'_password'] ?? '')) !== '' ? (string) $_POST[$emailsync['side'].'_password'] : (string) ($emailsync['stored_credentials']['password'] ?? ''),
-				'auth'=>'password'
-			];
-			$emailsync['tests'][$emailsync['side']] = \emailsync\MailboxSync::test($emailsync['connections'][$emailsync['side']]);
-		}
-		$emailsync['domain'] = \emailsync\DnsMonitor::sourceDomain((string) ($_POST['source_username'] ?? ''));
-		$emailsync['report_user'] = isset($tables['user']) ? mysqlFetchAssoc("SELECT `id`,`email` FROM ".$tables['user']." WHERE `ac` = 1 AND `email` = '".mysqlEscape(trim((string) ($_POST['report_email'] ?? '')))."' LIMIT 1") : false;
-		$emailsync['valid'] = (
-			trim((string) ($_POST['name'] ?? '')) !== '' &&
-			$emailsync['domain'] !== '' &&
-			!empty($emailsync['tests']['source']['result']) &&
-			!empty($emailsync['tests']['destination']['result']) &&
-			filter_var((string) ($_POST['report_email'] ?? ''),FILTER_VALIDATE_EMAIL) &&
-			!empty($emailsync['report_user']['id'])
-		);
-		if ($emailsync['valid']) {
-			foreach (['source','destination'] as $emailsync['side']) {
-				$emailsync['password'] = (string) ($emailsync['connections'][$emailsync['side']]['password'] ?? '');
-				unset($emailsync['connections'][$emailsync['side']]['password']);
-				$emailsync['connections'][$emailsync['side']] = \imap\ConnectionStore::save($emailsync['connections'][$emailsync['side']],$emailsync['password']);
-			}
-			$emailsync['job'] = \emailsync\JobStore::save([
-				'id'=>$emailsync['job']['id'] ?? '',
-				'name'=>$_POST['name'] ?? '',
-				'domain'=>$emailsync['domain'],
-				'source_id'=>$emailsync['connections']['source']['id'],
-				'destination_id'=>$emailsync['connections']['destination']['id'],
-				'phase'=>$emailsync['job']['phase'] ?? 'initial',
-				'active'=>$emailsync['job']['active'] ?? 1,
-				'report_user_id'=>(int) $emailsync['report_user']['id'],
-				'report_email'=>$_POST['report_email'] ?? ''
-			]);
-			$emailsync['output']['result'] = ['result'=>true,'id'=>$emailsync['job']['id']];
-		} else {
-			$emailsync['output']['result'] = [
-				'result'=>false,
-				'error'=>$emailsync['domain'] === '' ? 'mail_domain_missing' : 'invalid_configuration',
-				'connections'=>['source'=>$emailsync['tests']['source']['error'] ?? '','destination'=>$emailsync['tests']['destination']['error'] ?? '']
-			];
-		}
+		$emailsync['output']['result'] = \emailsync\JobConfiguration::save($_POST,$emailsync['id'] !== 'new' ? $emailsync['id'] : '');
 		$_POST['handled'] = true;
 	}
 
 	if (!isset($_POST['handled']) && $emailsync['action'] == 'ac' && $emailsync['id'] !== '') {
-		$emailsync['job'] = \emailsync\JobStore::update($emailsync['id'],function(array $job): array {
-			$job['active'] = ($job['phase'] ?? '') !== 'completed' && (int) ($_POST['value'] ?? 0) === 1 ? 1 : 0;
-			if ($job['active'] === 1) $job['next_run'] = 0;
-			return $job;
-		});
-		if ((int) ($emailsync['job']['active'] ?? 0) === 1) \ficms\Runtime::check('emailsync_worker',(int) ($_SERVER['now'] ?? time()),true,'seconds');
-		$emailsync['output']['result'] = ['result'=>!empty($emailsync['job'])];
+		$emailsync['output']['result'] = \emailsync\JobConfiguration::setActive($emailsync['id'],(int) ($_POST['value'] ?? 0) === 1);
+		if (empty($emailsync['output']['result']['result'])) $emailsync['activation_error'] = [$emailsync['id']=>$emailsync['output']['result']];
 		$_POST['handled'] = true;
 	}
 
@@ -134,10 +62,6 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 		$emailsync['job'] = $emailsync['id'] !== '' && $emailsync['id'] !== 'new' ? \emailsync\JobStore::get($emailsync['id']) : [];
 		$emailsync['source'] = !empty($emailsync['job']['source_id']) ? \imap\ConnectionStore::get((string) $emailsync['job']['source_id']) : [];
 		$emailsync['destination'] = !empty($emailsync['job']['destination_id']) ? \imap\ConnectionStore::get((string) $emailsync['job']['destination_id']) : [];
-		$emailsync['credentials'] = [
-			'source'=>!empty($emailsync['job']['source_id']) ? \imap\ConnectionStore::credentials((string) $emailsync['job']['source_id']) : [],
-			'destination'=>!empty($emailsync['job']['destination_id']) ? \imap\ConnectionStore::credentials((string) $emailsync['job']['destination_id']) : []
-		];
 		$emailsync['data'] = [
 			'name'=>$emailsync['job']['name'] ?? '',
 			'report_email'=>$emailsync['job']['report_email'] ?? ($user['email'] ?? ''),
@@ -145,12 +69,10 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			'source_port'=>$emailsync['source']['port'] ?? 993,
 			'source_security'=>$emailsync['source']['security'] ?? 'ssl',
 			'source_username'=>$emailsync['source']['username'] ?? '',
-			'source_password'=>$emailsync['credentials']['source']['password'] ?? '',
 			'destination_host'=>$emailsync['destination']['host'] ?? '',
 			'destination_port'=>$emailsync['destination']['port'] ?? 993,
 			'destination_security'=>$emailsync['destination']['security'] ?? 'ssl',
-			'destination_username'=>$emailsync['destination']['username'] ?? '',
-			'destination_password'=>$emailsync['credentials']['destination']['password'] ?? ''
+			'destination_username'=>$emailsync['destination']['username'] ?? ''
 		];
 
 		$emailsync['form_ui'] = new \ficms\Ui($settings['key'],'emailsync',$user['language']);
@@ -163,6 +85,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 		}
 		$emailsync['general']->field('name','input',$emailsync['data']['name'],['call'=>false,'attrs'=>['required'=>'required']]);
 		$emailsync['general']->field('report_email','input',$emailsync['data']['report_email'],['call'=>false,'attrs'=>['required'=>'required','inputmode'=>'email']]);
+		$emailsync['general']->text('activation-info',language__get($user['language'],empty($emailsync['job']) || ($emailsync['job']['phase'] ?? '') === 'draft' ? '_emailsync_draft_info' : '_emailsync_change_info'));
 		foreach (['source','destination'] as $emailsync['side']) {
 			$emailsync['has_secret'] = !empty($emailsync[$emailsync['side']]['has_secret']);
 			$emailsync['state'] = $emailsync['has_secret'] ? 'success' : 'warning';
@@ -179,11 +102,11 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 				'notify'=>$emailsync['state'],
 				'attrs'=>$emailsync['attrs']
 			]);
-			$emailsync['connection']->field($emailsync['side'].'_host','input',$emailsync['data'][$emailsync['side'].'_host'],['call'=>false,'attrs'=>['required'=>'required']]);
+			$emailsync['connection']->field($emailsync['side'].'_host','input',$emailsync['data'][$emailsync['side'].'_host'],['call'=>false]);
 			$emailsync['connection']->field($emailsync['side'].'_port','number',$emailsync['data'][$emailsync['side'].'_port'],['call'=>false,'attrs'=>['required'=>'required','min'=>1,'max'=>65535]]);
 			$emailsync['connection']->field($emailsync['side'].'_security','select',$emailsync['data'][$emailsync['side'].'_security'],['call'=>false,'options'=>['ssl'=>'IMAPS (SSL/TLS)','tls'=>'IMAP + STARTTLS']]);
-			$emailsync['connection']->field($emailsync['side'].'_username','input',$emailsync['data'][$emailsync['side'].'_username'],['call'=>false,'attrs'=>$emailsync['side'] === 'source' ? ['required'=>'required','inputmode'=>'email'] : ['required'=>'required']]);
-			$emailsync['connection']->field($emailsync['side'].'_password','password',$emailsync['data'][$emailsync['side'].'_password'],['call'=>false,'attrs'=>$emailsync['has_secret'] ? ['autocomplete'=>'new-password'] : ['autocomplete'=>'new-password','required'=>'required']]);
+			$emailsync['connection']->field($emailsync['side'].'_username','input',$emailsync['data'][$emailsync['side'].'_username'],['call'=>false,'attrs'=>$emailsync['side'] === 'source' ? ['required'=>'required','inputmode'=>'email'] : []]);
+			$emailsync['connection']->field($emailsync['side'].'_password','password','',['call'=>false,'attrs'=>$emailsync['has_secret'] ? ['autocomplete'=>'new-password','placeholder'=>language__get($user['language'],'_emailsync_password_keep')] : ['autocomplete'=>'new-password']]);
 			$emailsync['connection']->text($emailsync['side'].'-status',$emailsync['state_text'],['attrs'=>['data-emailsync-connection-status'=>$emailsync['side'],'data-notify'=>$emailsync['state']]]);
 		}
 
@@ -223,16 +146,25 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 	}
 }
 
+$emailsync['jobs'] = \emailsync\JobStore::list();
+$emailsync['statistics'] = \emailsync\JobStore::statistics();
 $emailsync['ui'] = new \ficms\Ui($settings['key'],'emailsync',$user['language']);
 $emailsync['ui']->refresh($_SERVER['now'] + 60);
 
 $emailsync['list'] = $emailsync['ui']->tab('synchronizations',['labels'=>'emailsync_tab'])->listing('list',['clear'=>true]);
 foreach ($emailsync['jobs'] as $emailsync['job']) {
 	$emailsync['job_progress'] = \emailsync\ProgressStore::summary($emailsync['job']);
+	$emailsync['item_error'] = $emailsync['activation_error'][(string) $emailsync['job']['id']] ?? [];
+	if (!empty($emailsync['item_error'])) {
+		$emailsync['item_error_text'] = [];
+		foreach (['source','destination'] as $emailsync['side']) if (!empty($emailsync['item_error']['connections'][$emailsync['side']])) $emailsync['item_error_text'][] = language__get($user['language'],'_emailsync_tab_'.$emailsync['side']).': '.(string) $emailsync['item_error']['connections'][$emailsync['side']];
+		if (!count($emailsync['item_error_text'])) $emailsync['item_error_text'][] = (string) ($emailsync['item_error']['error'] ?? 'invalid_configuration');
+	}
 	$emailsync['list']->item('job-'.$emailsync['job']['id'],[
 		'label'=>(string) $emailsync['job']['name'],
-		'subtitle'=>htmlspecialchars((string) $emailsync['job']['domain'].($emailsync['job_progress']['total'] > 0 ? ' · '.$emailsync['job_progress']['processed'].' / '.$emailsync['job_progress']['total'].' '.language__get($user['language'],'_emailsync_statistics_emails') : ''),ENT_QUOTES,'UTF-8'),
+		'subtitle'=>!empty($emailsync['item_error']) ? htmlspecialchars(str_replace('%error%',implode(' · ',$emailsync['item_error_text']),language__get($user['language'],'_emailsync_activation_failed')),ENT_QUOTES,'UTF-8') : htmlspecialchars((($emailsync['job']['phase'] ?? '') === 'draft' ? language__get($user['language'],'_emailsync_phase_draft').' · ' : '').(string) $emailsync['job']['domain'].($emailsync['job_progress']['total'] > 0 ? ' · '.$emailsync['job_progress']['processed'].' / '.$emailsync['job_progress']['total'].' '.language__get($user['language'],'_emailsync_statistics_emails') : ''),ENT_QUOTES,'UTF-8'),
 		'progress'=>\emailsync\ProgressStore::ratio($emailsync['job']),
+		'notify'=>!empty($emailsync['item_error']) ? 'error' : null,
 		'load'=>['id'=>$emailsync['job']['id'],'form'=>true],
 		'toggle'=>['id'=>$emailsync['job']['id'],'action'=>'ac','name'=>$settings['key'].'-'.$emailsync['job']['id'],'checked'=>(int) ($emailsync['job']['active'] ?? 0) === 1,'disabled'=>($emailsync['job']['phase'] ?? '') === 'completed'],
 		'delete'=>['id'=>$emailsync['job']['id']]
@@ -266,7 +198,7 @@ $emailsync['statistics_graph'] = ['series'=>['messages_processed'=>[]],'points'=
 foreach ($emailsync['statistics']['daily'] as $emailsync['day'] => $emailsync['messages']) $emailsync['statistics_graph']['points'][] = ['label'=>format__date_relative($emailsync['day'],'date',$user['language']),'data'=>['messages_processed'=>$emailsync['messages']]];
 $emailsync['statistics_graph']['points'] = statistics__limit_points($emailsync['statistics_graph']['points'],20);
 if (count($emailsync['statistics_graph']['points'])) $emailsync['charts']->statistics('statistics-graph','graph',statistics__format_graph($user['language'],$emailsync['statistics_graph'],['messages_processed'=>'_emailsync_statistics_messages_processed'],['gridLines'=>4,'legend'=>false,'decimals'=>0]),['attrs'=>['data-span'=>'all','data-label'=>language__get($user['language'],'_emailsync_statistics_daily')]]);
-foreach (['jobs','active','initial','monitoring','completed','failed','runs','messages_total','messages_processed','messages_pending','messages_transferred','messages_skipped'] as $emailsync['stat']) $emailsync['charts']->statistics('statistics-'.$emailsync['stat'],'info',['value'=>(int) $emailsync['statistics'][$emailsync['stat']],'label'=>language__get($user['language'],'_emailsync_statistics_'.$emailsync['stat'])]);
+foreach (array_filter(['jobs','active','draft','initial','monitoring','completed','failed','runs','messages_total','messages_processed','messages_pending','messages_transferred','messages_skipped'],fn($stat) => isset($emailsync['statistics'][$stat])) as $emailsync['stat']) $emailsync['charts']->statistics('statistics-'.$emailsync['stat'],'info',['value'=>(int) $emailsync['statistics'][$emailsync['stat']],'label'=>language__get($user['language'],'_emailsync_statistics_'.$emailsync['stat'])]);
 if ($emailsync['statistics']['messages_historic'] > 0) $emailsync['charts']->statistics('statistics-messages-historic','info',['value'=>$emailsync['statistics']['messages_historic'],'label'=>language__get($user['language'],'_emailsync_statistics_messages_historic')]);
 $emailsync['charts']->statistics('statistics-bytes','info',['value'=>number_format(((int) $emailsync['statistics']['bytes_transferred']) / 1048576,2,',','.').' MB','label'=>language__get($user['language'],'_emailsync_statistics_bytes_transferred')]);
 $emailsync['charts']->statistics('statistics-last-run','info',['value'=>$emailsync['statistics']['last_run'] > 0 ? format__date_relative($emailsync['statistics']['last_run'],'relative',$user['language'],true) : language__get($user['language'],'_emailsync_statistics_never'),'label'=>language__get($user['language'],'_emailsync_statistics_last_run')]);

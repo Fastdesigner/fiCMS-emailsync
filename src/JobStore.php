@@ -20,7 +20,7 @@ final class JobStore {
 		return isset($jobs[$id]) && is_array($jobs[$id]) ? $jobs[$id] : [];
 	}
 
-	public static function save(array $data): array {
+	public static function save(array $data, ?array $expectedSnapshot = null): array {
 		$id = self::id((string) ($data['id'] ?? ''));
 		if ($id === '') $id = 'sync-'.bin2hex(random_bytes(8));
 		$current = self::get($id);
@@ -57,21 +57,24 @@ final class JobStore {
 		],$current,self::normalize($data));
 		$job['id'] = $id;
 		$job['updated'] = $now;
-		if ((!$job['baseline_mx'] || (!empty($current) && ($current['domain'] ?? '') !== $job['domain'])) && $job['domain'] !== '') {
+		if ($job['phase'] !== 'draft' && (!$job['baseline_mx'] || (!empty($current) && ($current['domain'] ?? '') !== $job['domain'])) && $job['domain'] !== '') {
 			$job['baseline_mx'] = DnsMonitor::snapshot($job['domain']);
 			$job['current_mx'] = $job['baseline_mx'];
 			$job['cutover_detected'] = 0;
 		}
-		State::update(self::JOBS_FILE,function(array $jobs) use ($id,$job): array {
+		$matched = false;
+		$result = State::update(self::JOBS_FILE,function(array $jobs) use ($id,$job,$expectedSnapshot,&$matched): array {
+			if ($expectedSnapshot !== null && ($jobs[$id] ?? []) !== $expectedSnapshot) return $jobs;
+			$matched = true;
 			$jobs[$id] = $job;
 			return $jobs;
 		});
-		return $job;
+		return $result === false || !$matched ? [] : $job;
 	}
 
 	public static function update(string $id, callable $update): array {
 		$updated = [];
-		State::update(self::JOBS_FILE,function(array $jobs) use ($id,$update,&$updated): array {
+		$result = State::update(self::JOBS_FILE,function(array $jobs) use ($id,$update,&$updated): array {
 			if (!isset($jobs[$id]) || !is_array($jobs[$id])) return $jobs;
 			$updated = $update($jobs[$id]);
 			if (!is_array($updated)) $updated = $jobs[$id];
@@ -80,13 +83,13 @@ final class JobStore {
 			$jobs[$id] = $updated;
 			return $jobs;
 		});
-		return $updated;
+		return $result === false ? [] : $updated;
 	}
 
 	public static function due(int $now = 0): array {
 		$now = $now > 0 ? $now : (int) ($_SERVER['now'] ?? time());
 		foreach (self::list() as $job) {
-			if ((int) ($job['active'] ?? 0) !== 1 || ($job['phase'] ?? '') === 'completed') continue;
+			if ((int) ($job['active'] ?? 0) !== 1 || in_array(($job['phase'] ?? ''),['draft','completed'],true)) continue;
 			if ((int) ($job['next_run'] ?? 0) > $now) continue;
 			return $job;
 		}
@@ -152,13 +155,13 @@ final class JobStore {
 
 	public static function statistics(): array {
 		$jobs = self::list();
-		$statistics = ['jobs'=>0,'active'=>0,'initial'=>0,'monitoring'=>0,'completed'=>0,'failed'=>0,'runs'=>0,'messages_total'=>0,'messages_processed'=>0,'messages_pending'=>0,'messages_historic'=>0,'messages_transferred'=>0,'messages_skipped'=>0,'bytes_transferred'=>0,'last_run'=>0,'daily'=>Statistics::daily($jobs)];
+		$statistics = ['jobs'=>0,'active'=>0,'draft'=>0,'initial'=>0,'monitoring'=>0,'completed'=>0,'failed'=>0,'runs'=>0,'messages_total'=>0,'messages_processed'=>0,'messages_pending'=>0,'messages_historic'=>0,'messages_transferred'=>0,'messages_skipped'=>0,'bytes_transferred'=>0,'last_run'=>0,'daily'=>Statistics::daily($jobs)];
 		foreach ($jobs as $job) {
 			$progress = ProgressStore::summary($job);
 			$statistics['jobs']++;
-			$phase = in_array(($job['phase'] ?? ''),['initial','monitoring','completed'],true) ? $job['phase'] : 'initial';
+			$phase = in_array(($job['phase'] ?? ''),['draft','initial','monitoring','completed'],true) ? $job['phase'] : 'initial';
 			$statistics[$phase]++;
-			if ((int) ($job['active'] ?? 0) === 1 && $phase !== 'completed') $statistics['active']++;
+			if ((int) ($job['active'] ?? 0) === 1 && !in_array($phase,['draft','completed'],true)) $statistics['active']++;
 			if (($job['last_result'] ?? '') === 'failed') $statistics['failed']++;
 			$statistics['runs'] += max(0,(int) ($job['run_count'] ?? 0));
 			foreach (['total','processed','pending','historic'] as $key) $statistics['messages_'.$key] += $progress[$key];
@@ -171,13 +174,14 @@ final class JobStore {
 	}
 
 	private static function normalize(array $data): array {
-		$phase = in_array(($data['phase'] ?? ''),['initial','monitoring','completed'],true) ? $data['phase'] : 'initial';
+		$phase = in_array(($data['phase'] ?? ''),['draft','initial','monitoring','completed'],true) ? $data['phase'] : 'initial';
 		return [
 			'name'=>substr(trim((string) ($data['name'] ?? '')),0,160),
 			'domain'=>strtolower(rtrim(trim((string) ($data['domain'] ?? '')),'.')),
 			'source_id'=>preg_replace('/[^a-z0-9_.-]/i','',(string) ($data['source_id'] ?? '')),
 			'destination_id'=>preg_replace('/[^a-z0-9_.-]/i','',(string) ($data['destination_id'] ?? '')),
 			'phase'=>$phase,
+			'configuration_revision'=>(string) ($data['configuration_revision'] ?? ''),
 			'active'=>(int) ($data['active'] ?? 1) === 1 ? 1 : 0,
 			'interval'=>max(60,(int) ($data['interval'] ?? 1200)),
 			'quiet_period'=>max(3600,(int) ($data['quiet_period'] ?? 172800)),

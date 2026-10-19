@@ -10,7 +10,7 @@ final class Runner {
 
 	public static function run(string $id): array {
 		$job = JobStore::get($id);
-		if (!$job || (int) ($job['active'] ?? 0) !== 1 || ($job['phase'] ?? '') === 'completed') return ['success'=>false,'status'=>'not_runnable'];
+		if (!$job || (int) ($job['active'] ?? 0) !== 1 || in_array(($job['phase'] ?? ''),['draft','completed'],true)) return ['success'=>false,'status'=>'not_runnable'];
 		$job = Settings::apply($job);
 
 		$currentMx = DnsMonitor::snapshot((string) ($job['domain'] ?? ''));
@@ -21,7 +21,9 @@ final class Runner {
 		$job['last_run'] = time();
 		$job['last_result'] = 'running';
 		$job['run_count'] = (int) ($job['run_count'] ?? 0) + 1;
-		JobStore::update($id,fn(array $stored): array => array_merge($stored,$job));
+		$job = self::updateRun($id,$job,fn(array $stored): array => array_merge($stored,$job));
+
+		if (!$job) return ['success'=>false,'status'=>'configuration_changed'];
 
 		$source = \imap\ConnectionStore::credentials((string) ($job['source_id'] ?? ''));
 		$destination = \imap\ConnectionStore::credentials((string) ($job['destination_id'] ?? ''));
@@ -32,7 +34,7 @@ final class Runner {
 
 		if (empty($result['success'])) {
 			$firstFailure = (int) ($job['failure_count'] ?? 0) === 0;
-			$job = JobStore::update($id,function(array $stored) use ($result,$finished): array {
+			$job = self::updateRun($id,$job,function(array $stored) use ($result,$finished): array {
 				$stored['last_result'] = 'failed';
 				$stored['last_error'] = (string) ($result['error'] ?? 'unknown_error');
 				$stored['failure_count'] = (int) ($stored['failure_count'] ?? 0) + 1;
@@ -42,11 +44,13 @@ final class Runner {
 				if ((int) ($result['stats']['messages_discovered'] ?? 0) > 0) $stored['last_source_change'] = $finished;
 				return $stored;
 			});
+			if (!$job) return $result + ['status'=>'configuration_changed'];
 			if ($firstFailure) JobStore::event($id,'failed',self::summary($result));
+			if (!$job) return $result + ['status'=>'configuration_changed'];
 			return $result + ['job'=>$job];
 		}
 		if (!empty($result['partial'])) {
-			$job = JobStore::update($id,function(array $stored) use ($result,$finished): array {
+			$job = self::updateRun($id,$job,function(array $stored) use ($result,$finished): array {
 				$stored['last_result'] = 'partial';
 				$stored['last_error'] = '';
 				$stored['failure_count'] = 0;
@@ -57,11 +61,12 @@ final class Runner {
 				if ((int) ($result['stats']['messages_discovered'] ?? 0) > 0) $stored['last_source_change'] = $finished;
 				return $stored;
 			});
+			if (!$job) return $result + ['status'=>'configuration_changed'];
 			return $result + ['job'=>$job];
 		}
 
 		$wasInitial = ($job['phase'] ?? 'initial') === 'initial';
-		$job = JobStore::update($id,function(array $stored) use ($result,$finished,$wasInitial): array {
+		$job = self::updateRun($id,$job,function(array $stored) use ($result,$finished,$wasInitial): array {
 			$discovered = $result['stats']['messages_discovered'] ?? null;
 			$stored['last_result'] = 'success';
 			$stored['last_error'] = '';
@@ -78,20 +83,33 @@ final class Runner {
 			return $stored;
 		});
 
+		if (!$job) return $result + ['status'=>'configuration_changed'];
 		if ($wasInitial) JobStore::event($id,'initial_complete',self::summary($result));
 		if (!self::complete($job,$result,$finished)) return $result + ['job'=>$job];
 
-		$job = JobStore::update($id,function(array $stored) use ($finished): array {
+		$job = self::updateRun($id,$job,function(array $stored) use ($finished): array {
 			$stored['phase'] = 'completed';
 			$stored['active'] = 0;
 			$stored['completed'] = $finished;
 			$stored['next_run'] = 0;
 			return $stored;
 		});
+		if (!$job) return $result + ['status'=>'configuration_changed'];
 		\imap\ConnectionStore::purgeSecret((string) ($job['source_id'] ?? ''));
 		\imap\ConnectionStore::purgeSecret((string) ($job['destination_id'] ?? ''));
 		JobStore::event($id,'completed',self::summary($result));
 		return $result + ['job'=>$job];
+	}
+
+	private static function updateRun(string $id, array $expected, callable $update): array {
+		$matched = false;
+		$result = JobStore::update($id,function(array $stored) use ($expected,$update,&$matched): array {
+			foreach (['source_id','destination_id','configuration_revision'] as $field) if (($stored[$field] ?? '') !== ($expected[$field] ?? '')) return $stored;
+			if ((int) ($stored['active'] ?? 0) !== 1 || in_array(($stored['phase'] ?? ''),['draft','completed'],true)) return $stored;
+			$matched = true;
+			return $update($stored);
+		});
+		return $matched ? $result : [];
 	}
 
 	private static function complete(array $job, array $result, int $finished): bool {

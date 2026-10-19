@@ -22,7 +22,7 @@ Für eine lokale Entwicklungsinstallation kann dieses Repository direkt nach `sy
 2. Einen neuen Job anlegen und Domain, Report-Empfänger, Quellpostfach und Zielpostfach eintragen.
 3. Optional die erwarteten MX-Zielhosts hinterlegen. Damit wird nicht jede beliebige MX-Änderung als Umzug akzeptiert.
 4. Intervall, Ruhezeit, Mindestnachlauf und Ersatz-TTL prüfen. Standard sind 60 Minuten, 48 Stunden, sieben Tage und 24 Stunden.
-5. Speichern. Der Job ist aktiv und wird beim nächsten Cron-Lauf berücksichtigt.
+5. Speichern legt einen inaktiven Entwurf an. Nach Ergänzen der Zugangsdaten den Aktiv-Schalter einschalten; erst nach erfolgreicher Prüfung beider Verbindungen wird der Job beim nächsten Cron-Lauf berücksichtigt.
 
 Der erste erfolgreiche Lauf überführt den Job von `initial` nach `monitoring` und erzeugt einen Ereignisreport. Weitere Läufe übertragen nur noch fehlende Nachrichten. Ein erkannter MX-Wechsel startet den Nachlauf. Abgeschlossen wird erst, wenn mindestens ein vollständiges TTL-Fenster vergangen ist, danach 48 Stunden keine neue Quellnachricht übertragen wurde, der Mindestnachlauf erfüllt ist und ein erfolgreicher Lauf null neue Nachrichten meldet.
 
@@ -41,3 +41,15 @@ Der Transfer ist additiv und löscht weder Nachrichten noch Ordner. Nachrichten 
 - spätere Inbox-Funktion: eigener dauerhafter Consumer der Core-Verbindungen, unabhängig von diesem Migrations-Add-on
 
 Der Job-State und die geschützten Laufprotokolle liegen unter `system/plugins/fiCMS-emailsync/state` und werden nicht versioniert.
+
+## Aufträge vorbereiten
+
+Neue Aufträge werden als inaktive Entwürfe gespeichert. Bezeichnung, ein aktiver fiCMS-Benutzer
+als Report-Empfänger und die Quelladresse genügen; Serverdaten und Passwörter können später
+ergänzt werden. Speichern führt keine IMAP-Anmeldung und keinen Kopierlauf aus.
+
+Erst der vorhandene Aktiv-Schalter prüft beide Verbindungen und startet bei Erfolg die
+Erstsynchronisierung beim nächsten Cron. Fehlende oder falsche Zugangsdaten lassen den Entwurf
+inaktiv. Auch API-Aktivierung und „beim nächsten Cron ausführen“ verwenden diese Prüfung.
+Änderungen an Verbindungen pausieren den Auftrag. Nach dem ersten Lauf lässt sich die Identität
+der Quell- und Zielpostfächer nicht mehr wechseln; dafür ist ein eigener Auftrag nötig.

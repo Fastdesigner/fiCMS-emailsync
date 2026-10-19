@@ -21,16 +21,12 @@ if ($emailsync_mcp['id'] === 'settings') {
 if ($emailsync_mcp['id'] === '' || !\emailsync\JobStore::get($emailsync_mcp['id'])) return ['error'=>'Email-sync job not found.'];
 if (isset($emailsync_mcp['data']['cutover']) && !in_array($emailsync_mcp['data']['cutover'],['confirm','reset'],true)) return ['error'=>'cutover must be confirm or reset.'];
 
+if (array_key_exists('active',$emailsync_mcp['data']) || !empty($emailsync_mcp['data']['run_next_cron'])) {
+	$emailsync_mcp['activation'] = \emailsync\JobConfiguration::setActive($emailsync_mcp['id'],!empty($emailsync_mcp['data']['run_next_cron']) || (int) $emailsync_mcp['data']['active'] === 1);
+	if (empty($emailsync_mcp['activation']['result'])) return $emailsync_mcp['activation'];
+}
+
 $emailsync_mcp['job'] = \emailsync\JobStore::update($emailsync_mcp['id'],function(array $job) use ($emailsync_mcp): array {
-	if (array_key_exists('active',$emailsync_mcp['data']) && ($job['phase'] ?? '') !== 'completed') {
-		$job['active'] = (int) $emailsync_mcp['data']['active'] === 1 ? 1 : 0;
-		if ($job['active'] === 1) $job['next_run'] = 0;
-	}
-	if (!empty($emailsync_mcp['data']['run_next_cron']) && ($job['phase'] ?? '') !== 'completed') {
-		$job['active'] = 1;
-		$job['next_run'] = 0;
-		\ficms\Runtime::check('emailsync_worker',(int) ($_SERVER['now'] ?? time()),true,'seconds');
-	}
 	if (($emailsync_mcp['data']['cutover'] ?? '') === 'confirm' && ($job['phase'] ?? '') === 'monitoring') $job['cutover_detected'] = (int) ($_SERVER['now'] ?? time());
 	if (($emailsync_mcp['data']['cutover'] ?? '') === 'reset' && ($job['phase'] ?? '') === 'monitoring') {
 		$job['cutover_detected'] = 0;
