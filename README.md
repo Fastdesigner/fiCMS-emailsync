@@ -119,9 +119,19 @@ der Quell- und Zielpostfächer nicht mehr wechseln; dafür ist ein eigener Auftr
 php dev/tests/drafts.php
 php dev/tests/mcp.php
 php dev/tests/protected-concurrency.php
+php dev/tests/protected-failures.php
 ```
 
 Der Konkurrenztest benötigt `pcntl` und einen benachbarten fiCMS-Checkout (alternativ
 `FICMS_CORE=/pfad/zu/fiCMS`). Er verwendet die vorhandenen Core-Owner für Lock und
 verschlüsselte Verbindungen mit zwei echten PHP-Prozessen. Sämtlicher Zustand besteht
 aus synthetischen Fixtures in einem temporären Verzeichnis, das am Testende entfernt wird.
+
+Der Fehlertest verwendet dieselben unveränderten Core-Owner. Er prüft einen nicht
+beschreibbaren Connectionstore, einen globalen PHP-Fehlerhandler mit Trace-Argumenten
+und eine gezielte Exception im Plugin-State-Adapter nach erfolgreicher Connection-Persistenz.
+Der geschützte Schreibaufruf ersetzt PHP-Warnungen lokal durch eine feste Exception ohne
+Verkettung oder Trace-Argumente und stellt den vorherigen Handler im `finally` wieder her.
+Auch nach einer Exception beim Jobschreiben läuft der Cleanup; er entfernt ausschließlich
+neu angelegte, von keinem Job referenzierte Verbindungen. Das garantiert keine
+crashsichere Transaktion bei Prozessabbruch oder eine Bereinigung trotz anhaltender I/O-Fehler.
