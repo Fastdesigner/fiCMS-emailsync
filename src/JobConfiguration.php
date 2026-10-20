@@ -27,9 +27,41 @@ final class JobConfiguration {
 		return MailboxSync::test($connection);
 	}
 
-	public static function save(array $data, string $id = ''): array {
+	public static function saveProtectedCredential(array $data, string $id): array {
+		$fields = array_keys($data);
+		$passwords = array_values(array_intersect($fields,['source_password','destination_password']));
+		if (count($fields) !== 3 || count($passwords) !== 1
+			|| !is_string($data[$passwords[0]]) || $data[$passwords[0]] === ''
+			|| !is_string($data['expected_configuration_revision'] ?? null) || $data['expected_configuration_revision'] === ''
+			|| !is_array($data['expected_identity'] ?? null) || count($data['expected_identity']) !== 2) return ['result'=>false,'error'=>'invalid_protected_credential_write'];
+		foreach (['source','destination'] as $side) {
+			$identity = $data['expected_identity'][$side] ?? null;
+			if (!is_array($identity) || count($identity) !== 5 || !is_int($identity['port'] ?? null)) return ['result'=>false,'error'=>'invalid_protected_credential_write'];
+			foreach (['id','host','security','username'] as $field) if (!is_string($identity[$field] ?? null)) return ['result'=>false,'error'=>'invalid_protected_credential_write'];
+		}
+		try {
+			$result = self::save([$passwords[0]=>$data[$passwords[0]]],$id,$data);
+			if (empty($result['result'])) return ['result'=>false,'error'=>($result['error'] ?? '') === 'target_changed' ? 'target_changed' : 'credential_write_failed'];
+			return ['result'=>true,'type'=>'emailsync','id'=>$id,'status'=>'submitted'];
+		} catch (\Throwable $exception) {
+			return ['result'=>false,'error'=>'credential_write_failed'];
+		}
+	}
+
+	private static function matchesIdentity(array $current, array $expected): bool {
+		if (($current['configuration_revision'] ?? '') !== $expected['expected_configuration_revision']) return false;
+		foreach (['source','destination'] as $side) {
+			$stored = \imap\ConnectionStore::get((string) ($current[$side.'_id'] ?? ''));
+			foreach (['id','host','port','security','username'] as $field) if (($stored[$field] ?? null) !== $expected['expected_identity'][$side][$field]) return false;
+		}
+		return true;
+	}
+
+	public static function save(array $data, string $id = '', ?array $expected = null): array {
 		$current = $id !== '' ? JobStore::get($id) : [];
 		if ($id !== '' && !$current) return ['result'=>false,'error'=>'job_not_found'];
+		if ($expected !== null && !self::matchesIdentity($current,$expected)) return ['result'=>false,'error'=>'target_changed'];
+		if ($expected !== null && !empty($current['active'])) return ['result'=>false,'error'=>'credential_write_failed'];
 		if (($current['phase'] ?? '') === 'completed') return ['result'=>false,'error'=>'job_completed'];
 		$name = trim((string) ($data['name'] ?? $current['name'] ?? ''));
 		$email = trim((string) ($data['report_email'] ?? $current['report_email'] ?? ''));
@@ -66,34 +98,47 @@ final class JobConfiguration {
 		$domain = DnsMonitor::sourceDomain($connections['source']['metadata']['username']);
 		if ($domain === '') return ['result'=>false,'error'=>'mail_domain_missing'];
 		$created = [];
-		foreach ($connections as $side => $connection) {
-			if ($connection['metadata']['id'] !== '') {
-				$connections[$side] = $connection['stored'];
-				continue;
-			}
-			$connections[$side] = \imap\ConnectionStore::save($connection['metadata'],$connection['password']);
-			$created[] = (string) ($connections[$side]['id'] ?? '');
-			$persisted = \imap\ConnectionStore::credentials(end($created));
-			$valid = !empty($persisted['id']);
-			foreach (['host','port','security','username'] as $field) if ((string) ($persisted[$field] ?? '') !== (string) $connection['metadata'][$field]) $valid = false;
-			if (!hash_equals($connection['password'],(string) ($persisted['password'] ?? ''))) $valid = false;
-			if (!$valid) {
-				self::removeConnections($created);
-				return ['result'=>false,'error'=>'connection_write_failed'];
-			}
-		}
+		$writeError = 'job_write_failed';
 		$phase = (string) ($current['phase'] ?? 'draft');
-		if ($changed && $phase === 'initial') $phase = 'draft';
+		if ($expected === null && $changed && $phase === 'initial') $phase = 'draft';
 		$job = JobStore::save(array_merge($current,[
 			'id'=>$current['id'] ?? '', 'name'=>$name, 'domain'=>$domain,
-			'source_id'=>$connections['source']['id'], 'destination_id'=>$connections['destination']['id'],
+			'source_id'=>$current['source_id'] ?? '', 'destination_id'=>$current['destination_id'] ?? '',
 			'phase'=>$phase, 'active'=>$changed ? 0 : (int) ($current['active'] ?? 0),
 			'configuration_revision'=>bin2hex(random_bytes(16)),
 			'report_user_id'=>(int) $recipient['id'], 'report_email'=>$email
-		]),$current ?: null);
+		]),$current ?: null,function(array $job) use ($current,$expected,$connections,&$created,&$writeError): array {
+			try {
+				if ($expected !== null && !self::matchesIdentity($current,$expected)) { $writeError = 'target_changed'; return []; }
+				$writeError = 'job_write_failed';
+				foreach ($connections as $side => $connection) {
+					if ($connection['metadata']['id'] !== '') {
+						$connections[$side] = $connection['stored'];
+						continue;
+					}
+					$connections[$side] = \imap\ConnectionStore::save($connection['metadata'],$connection['password']);
+					$created[] = (string) ($connections[$side]['id'] ?? '');
+					$persisted = \imap\ConnectionStore::credentials(end($created));
+					$valid = !empty($persisted['id']);
+					foreach (['host','port','security','username'] as $field) if ((string) ($persisted[$field] ?? '') !== (string) $connection['metadata'][$field]) $valid = false;
+					if (!hash_equals($connection['password'],(string) ($persisted['password'] ?? ''))) $valid = false;
+					if (!$valid) {
+						$writeError = 'connection_write_failed';
+						return [];
+					}
+				}
+				if ($expected !== null) $job = array_merge($current,['configuration_revision'=>$job['configuration_revision'],'updated'=>$job['updated']]);
+				foreach (['source','destination'] as $side) $job[$side.'_id'] = $connections[$side]['id'];
+				return $job;
+			} catch (\Throwable $exception) {
+				$writeError = 'connection_write_failed';
+				return [];
+			}
+		},$expected === null);
 		if (!$job) {
 			self::removeConnections($created);
-			return ['result'=>false,'error'=>'job_write_failed'];
+			if ($expected !== null && JobStore::get($id) !== $current) $writeError = 'target_changed';
+			return ['result'=>false,'error'=>$writeError];
 		}
 		foreach ($previousIds as $side => $previousId) {
 			if ($previousId === '' || $previousId === $job[$side.'_id']) continue;

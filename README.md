@@ -47,6 +47,50 @@ Verbindung gespeichert. Konfiguration und Laufbefehle sind getrennte Aufrufe. Mi
 `update(...,data:{test_connection:"destination"})` wird nur das vorhandene Ziel geprüft;
 das startet keinen Kopierlauf. `active:1` prüft weiterhin beide Verbindungen.
 
+### Atomar gebundene Passwortübernahme
+
+Ein serverseitiger Executor kann nach `get(...,data:{view:"edit"})` genau ein Passwort
+an den zuvor autorisierten Jobstand binden. Der bestehende `update`-Handler verwendet:
+
+```json
+{
+  "type": "emailsync",
+  "id": "<job-id>",
+  "data": {
+    "source_password": "<nur im geschützten Serverprozess>",
+    "expected_configuration_revision": "<get.job.configuration_revision>",
+    "expected_identity": {
+      "source": {"id":"<id>","host":"<host>","port":993,"security":"ssl","username":"<username>"},
+      "destination": {"id":"<id>","host":"<host>","port":993,"security":"ssl","username":"<username>"}
+    }
+  }
+}
+```
+
+Beide Identitäten enthalten exakt die fünf Werte aus `get.job.source` und
+`get.job.destination`; `port` ist eine JSON-Ganzzahl. Alternativ wird ausschließlich
+`destination_password` geschrieben. Sobald einer der `expected_*`-Parameter vorkommt,
+sind beide Pflicht: genau ein nichtleeres Passwortfeld, keine weiteren Konfigurationsfelder
+oder Laufbefehle. Ohne diese Parameter bleiben normale Konfigurationsänderungen kompatibel.
+Der Executor muss beide Identitäten und die Revision an seinen autorisierten Zielstand binden;
+dieser Vergleich ersetzt keine Berechtigungsprüfung im CRM.
+
+Unter dem bestehenden `jobs.json`-Lock wird der vollständige gelesene Job-Snapshot verglichen.
+Erst danach werden Revision und beide Verbindungsidentitäten erneut geprüft und die neue
+Verbindung über `imap\ConnectionStore` gespeichert. Änderungen am Job während des Aufrufs
+führen vor jeder Secretpersistenz zur Ablehnung. Bestehende Verbindungen werden beim Schreiben
+nicht überschrieben; bei fehlgeschlagenem Speichern werden neu angelegte Verbindungen entfernt.
+Das Passwort der anderen Seite bleibt erhalten. Aktive Jobs werden ohne Änderung mit
+`credential_write_failed` abgewiesen; inaktive Jobs behalten ihre Phase. Es gibt keine Aktivierung, Verbindungsprüfung,
+Nachlaufänderung oder Übertragung als Nebenwirkung.
+
+Erfolg enthält exakt `{"result":true,"type":"emailsync","id":"<job-id>","status":"submitted"}`.
+Fehler enthalten ausschließlich `{"result":false,"error":"<code>"}` mit `target_changed`,
+`invalid_protected_credential_write` oder `credential_write_failed`. Fremde Exceptions und
+Passwörter werden nicht zurückgegeben. `submitted` bestätigt die Speicherung; eine neue
+secretfreie `get`-Abfrage kann `secret_present` prüfen. Ein unklarer Transportausgang ist
+kein Anlass zur automatischen Wiederholung.
+
 Der Transfer ist additiv und löscht weder Nachrichten noch Ordner. Nachrichten werden als unveränderte MIME-Rohdaten samt Empfangsdatum und den Flags `Seen`, `Answered`, `Flagged` und `Draft` übertragen. Der Fortschritt wird pro Ordner nach jeder Nachricht über Quell-UID und UIDVALIDITY gespeichert. Bei einem abgebrochenen Lauf wird daran angeknüpft; vor dem erneuten Anhängen prüft das Add-on mögliche Zielnachrichten anhand ihres SHA-256-Inhalts-Hashs.
 
 ## Zuständigkeiten
@@ -68,3 +112,16 @@ Erstsynchronisierung beim nächsten Cron. Fehlende oder falsche Zugangsdaten las
 inaktiv. Auch API-Aktivierung und „beim nächsten Cron ausführen“ verwenden diese Prüfung.
 Änderungen an Verbindungen pausieren den Auftrag. Nach dem ersten Lauf lässt sich die Identität
 der Quell- und Zielpostfächer nicht mehr wechseln; dafür ist ein eigener Auftrag nötig.
+
+## Entwicklungsprüfungen
+
+```sh
+php dev/tests/drafts.php
+php dev/tests/mcp.php
+php dev/tests/protected-concurrency.php
+```
+
+Der Konkurrenztest benötigt `pcntl` und einen benachbarten fiCMS-Checkout (alternativ
+`FICMS_CORE=/pfad/zu/fiCMS`). Er verwendet die vorhandenen Core-Owner für Lock und
+verschlüsselte Verbindungen mit zwei echten PHP-Prozessen. Sämtlicher Zustand besteht
+aus synthetischen Fixtures in einem temporären Verzeichnis, das am Testende entfernt wird.

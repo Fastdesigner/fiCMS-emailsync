@@ -1,9 +1,9 @@
 <?php
 namespace emailsync {
  final class State {
-  public static array $files=[]; public static bool $fail=false;
+  public static array $files=[]; public static bool $fail=false; public static $beforeUpdate=null;
   public static function read(string $name):array{return self::$files[$name]??[];}
-  public static function update(string $name,callable $update):array|false{return self::$fail?false:self::$files[$name]=$update(self::read($name));}
+  public static function update(string $name,callable $update):array|false{if(self::$beforeUpdate){$callback=self::$beforeUpdate;self::$beforeUpdate=null;$callback();}return self::$fail?false:self::$files[$name]=$update(self::read($name));}
  }
  final class DnsMonitor {
   public static $onSnapshot=null;
@@ -18,9 +18,9 @@ namespace emailsync {
 }
 namespace imap {
  final class ConnectionStore {
-  public static array $connections=[]; public static bool $failSave=false; private static int $counter=0;
+  public static array $connections=[]; public static bool $failSave=false; public static int $saves=0; public static string $throwSave=""; private static int $counter=0;
   public static function get(string $id):array{$c=self::$connections[$id]??[];if($c){$c['has_secret']=!empty($c['secret']);unset($c['secret']);}return $c;}
-  public static function save(array $data,string $password=''):array{$id=$data['id']?:'conn-'.(++self::$counter);$c=array_merge(self::$connections[$id]??[], $data,['id'=>$id]);if($password!=='')$c['secret']=$password;if(self::$failSave)return array_diff_key($c,['secret'=>true]);self::$connections[$id]=$c;return self::get($id);}
+  public static function save(array $data,string $password=''):array{self::$saves++;if(self::$throwSave!=='')throw new \RuntimeException(self::$throwSave);$id=$data['id']?:'conn-'.(++self::$counter);$c=array_merge(self::$connections[$id]??[], $data,['id'=>$id]);if($password!=='')$c['secret']=$password;if(self::$failSave)return array_diff_key($c,['secret'=>true]);self::$connections[$id]=$c;return self::get($id);}
   public static function delete(string $id):bool{unset(self::$connections[$id]);return true;}
   public static function credentials(string $id):array{$c=self::get($id);$c['password']=self::$connections[$id]['secret']??'';return $c;}
  }

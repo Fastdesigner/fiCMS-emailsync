@@ -20,7 +20,7 @@ final class JobStore {
 		return isset($jobs[$id]) && is_array($jobs[$id]) ? $jobs[$id] : [];
 	}
 
-	public static function save(array $data, ?array $expectedSnapshot = null): array {
+	public static function save(array $data, ?array $expectedSnapshot = null, ?callable $prepare = null, bool $initializeBaseline = true): array {
 		$id = self::id((string) ($data['id'] ?? ''));
 		if ($id === '') $id = 'sync-'.bin2hex(random_bytes(8));
 		$current = self::get($id);
@@ -57,14 +57,20 @@ final class JobStore {
 		],$current,self::normalize($data));
 		$job['id'] = $id;
 		$job['updated'] = $now;
-		if ($job['phase'] !== 'draft' && (!$job['baseline_mx'] || (!empty($current) && ($current['domain'] ?? '') !== $job['domain'])) && $job['domain'] !== '') {
+		if ($initializeBaseline && $job['phase'] !== 'draft' && (!$job['baseline_mx'] || (!empty($current) && ($current['domain'] ?? '') !== $job['domain'])) && $job['domain'] !== '') {
 			$job['baseline_mx'] = DnsMonitor::snapshot($job['domain']);
 			$job['current_mx'] = $job['baseline_mx'];
 			$job['cutover_detected'] = 0;
 		}
 		$matched = false;
-		$result = State::update(self::JOBS_FILE,function(array $jobs) use ($id,$job,$expectedSnapshot,&$matched): array {
+		$result = State::update(self::JOBS_FILE,function(array $jobs) use ($id,&$job,$expectedSnapshot,$prepare,&$matched): array {
 			if ($expectedSnapshot !== null && ($jobs[$id] ?? []) !== $expectedSnapshot) return $jobs;
+			// Prepare connection writes only after the snapshot matches, while the job lock is held.
+			if ($prepare !== null) {
+				$prepared = $prepare($job);
+				if (!$prepared) return $jobs;
+				$job = $prepared;
+			}
 			$matched = true;
 			$jobs[$id] = $job;
 			return $jobs;
