@@ -97,15 +97,19 @@ namespace {
   $beforeJob=\emailsync\JobStore::get($protectedId);$beforeConnections=\imap\ConnectionStore::$connections;
   check(mcpCall('update',['id'=>$protectedId,'data'=>$payload])===['result'=>false,'error'=>'credential_write_failed']&&\emailsync\JobStore::get($protectedId)===$beforeJob&&\imap\ConnectionStore::$connections===$beforeConnections&&\imap\ConnectionStore::$saves===$beforeSaves,'active job is rejected without even a temporary ConnectionStore save');
  }
- foreach(['draft','initial','monitoring'] as $phase) {
-  \emailsync\JobStore::update($protectedId,fn($job)=>array_merge($job,['active'=>0,'phase'=>$phase,'baseline_mx'=>[],'current_mx'=>[],'next_run'=>123456,'cutover_detected'=>789,'run_count'=>$phase==='monitoring'?3:0]));
+ foreach(['draft','initial','monitoring','completed'] as $phase) {
+  \emailsync\JobStore::update($protectedId,fn($job)=>array_merge($job,['active'=>0,'phase'=>$phase,'baseline_mx'=>[],'current_mx'=>[],'next_run'=>123456,'cutover_detected'=>789,'run_count'=>in_array($phase,['monitoring','completed'],true)?3:0,'completed'=>$phase==='completed'?987654:0]));
   $beforeJob=\emailsync\JobStore::get($protectedId);
+  $destination=\imap\ConnectionStore::$connections[$beforeJob['destination_id']];
   $payload=binding($protectedId,'synthetic-inactive-'.$phase);
   check(mcpCall('update',['id'=>$protectedId,'data'=>$payload])['status']==='submitted','protected write supports inactive '.$phase.' jobs');
   $afterJob=\emailsync\JobStore::get($protectedId);
+  check(\imap\ConnectionStore::credentials($afterJob['source_id'])['password']==='synthetic-inactive-'.$phase&&\imap\ConnectionStore::$connections[$afterJob['destination_id']]===$destination,'protected source write updates only the intended password in inactive '.$phase.' jobs');
   foreach(['source_id','configuration_revision','updated'] as $field) {unset($beforeJob[$field],$afterJob[$field]);}
   check($afterJob===$beforeJob,'protected write preserves every other configuration and runtime field of inactive '.$phase.' jobs');
  }
+ $beforeCompleted=\emailsync\JobStore::get($protectedId);$beforeConnections=\imap\ConnectionStore::$connections;$beforeSaves=\imap\ConnectionStore::$saves;
+ check(mcpCall('update',['id'=>$protectedId,'data'=>['name'=>'Must stay completed']])===['result'=>false,'error'=>'job_completed']&&\emailsync\JobStore::get($protectedId)===$beforeCompleted&&\imap\ConnectionStore::$connections===$beforeConnections&&\imap\ConnectionStore::$saves===$beforeSaves,'ordinary completed-job configuration remains blocked without writes');
  $beforeJob=\emailsync\JobStore::get($protectedId);$source=\imap\ConnectionStore::$connections[$beforeJob['source_id']];
  $payload=binding($protectedId,'unused');unset($payload['source_password']);$payload['destination_password']='synthetic-destination-replacement';
  check(mcpCall('update',['id'=>$protectedId,'data'=>$payload])===['result'=>true,'type'=>'emailsync','id'=>$protectedId,'status'=>'submitted']&&\imap\ConnectionStore::$connections[$beforeJob['source_id']]===$source,'protected destination write likewise retains the complete source connection');

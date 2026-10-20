@@ -75,7 +75,7 @@ final class JobConfiguration {
 		if ($id !== '' && !$current) return ['result'=>false,'error'=>'job_not_found'];
 		if ($expected !== null && !self::matchesIdentity($current,$expected)) return ['result'=>false,'error'=>'target_changed'];
 		if ($expected !== null && !empty($current['active'])) return ['result'=>false,'error'=>'credential_write_failed'];
-		if (($current['phase'] ?? '') === 'completed') return ['result'=>false,'error'=>'job_completed'];
+		if ($expected === null && ($current['phase'] ?? '') === 'completed') return ['result'=>false,'error'=>'job_completed'];
 		$name = trim((string) ($data['name'] ?? $current['name'] ?? ''));
 		$email = trim((string) ($data['report_email'] ?? $current['report_email'] ?? ''));
 		if ($name === '' || !filter_var($email,FILTER_VALIDATE_EMAIL)) return ['result'=>false,'error'=>'invalid_configuration'];
