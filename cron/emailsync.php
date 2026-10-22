@@ -1,6 +1,6 @@
 <?php
 
-if (!$site['onsite'] || !\ficms\Runtime::check('emailsync_worker',20,false,'minutes')) return;
+if (!$site['onsite']) return;
 
 $emailsync = ['result'=>[]];
 set_time_limit(0);

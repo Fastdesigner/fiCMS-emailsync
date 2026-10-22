@@ -64,7 +64,7 @@
   "_emailsync_reset_cutover_confirm": "¿Restablecer el cambio MX detectado y su periodo posterior activo?",
   "_emailsync_report_subject": "Sincronización de buzones",
   "_emailsync_event_initial_complete": "La sincronización inicial de %domain% finalizó el %date%. El buzón seguirá supervisado hasta el cambio MX y el periodo posterior.",
-  "_emailsync_event_completed": "La sincronización de %domain% finalizó el %date%. Se cumplieron los periodos TTL, de supervisión y de inactividad; las contraseñas guardadas fueron eliminadas.",
+  "_emailsync_event_completed": "La sincronización de %domain% finalizó el %date%. Han transcurrido los períodos TTL, de supervisión mínima y de inactividad. Los accesos guardados siguen disponibles.",
   "_emailsync_event_failed": "La sincronización de %domain% falló el %date% y se reintentará en la próxima ejecución cron prevista.",
   "_emailsync_run_summary": "Estado de la sincronización",
   "_emailsync_statistics_jobs": "Tareas",
@@ -89,5 +89,6 @@
   "_emailsync_statistics_errors": "Errores",
   "_emailsync_statistics_bytes_transferred": "Datos",
   "_emailsync_statistics_last_run": "Última ejecución",
-  "_emailsync_statistics_never": "Sin ejecuciones"
+  "_emailsync_statistics_never": "Sin ejecuciones",
+  "_emailsync_result_source_unavailable": "En pausa: origen inaccesible tras el cambio MX. Requiere revisión final."
 }

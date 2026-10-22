@@ -44,12 +44,7 @@ if (array_key_exists('active',$emailsync_mcp['data']) || !empty($emailsync_mcp['
 }
 
 $emailsync_mcp['job'] = \emailsync\JobStore::update($emailsync_mcp['id'],function(array $job) use ($emailsync_mcp): array {
-	if (($emailsync_mcp['data']['cutover'] ?? '') === 'confirm' && ($job['phase'] ?? '') === 'monitoring') $job['cutover_detected'] = (int) ($_SERVER['now'] ?? time());
-	if (($emailsync_mcp['data']['cutover'] ?? '') === 'reset' && ($job['phase'] ?? '') === 'monitoring') {
-		$job['cutover_detected'] = 0;
-		$job['baseline_mx'] = \emailsync\DnsMonitor::snapshot((string) ($job['domain'] ?? ''));
-		$job['current_mx'] = $job['baseline_mx'];
-	}
+	if (isset($emailsync_mcp['data']['cutover'])) return \emailsync\DnsMonitor::confirm($job,$emailsync_mcp['data']['cutover'] === 'reset');
 	return $job;
 });
 

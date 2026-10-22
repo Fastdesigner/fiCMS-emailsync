@@ -64,7 +64,7 @@
   "_emailsync_reset_cutover_confirm": "Really reset the detected MX cutover and its active grace period?",
   "_emailsync_report_subject": "Mailbox synchronization",
   "_emailsync_event_initial_complete": "The initial synchronization for %domain% completed on %date%. The mailbox will remain monitored until the MX cutover and the subsequent grace period have finished.",
-  "_emailsync_event_completed": "Synchronization for %domain% completed on %date%. The TTL, minimum monitoring and quiet periods have elapsed; the stored mailbox passwords were deleted.",
+  "_emailsync_event_completed": "Synchronization for %domain% completed on %date%. The TTL, minimum monitoring and quiet periods have elapsed. Saved connections remain available.",
   "_emailsync_event_failed": "Synchronization for %domain% failed on %date% and will be retried by the next due cron run.",
   "_emailsync_run_summary": "Synchronization progress",
   "_emailsync_statistics_jobs": "Jobs",
@@ -89,5 +89,6 @@
   "_emailsync_statistics_errors": "Errors",
   "_emailsync_statistics_bytes_transferred": "Data",
   "_emailsync_statistics_last_run": "Latest run",
-  "_emailsync_statistics_never": "No run yet"
+  "_emailsync_statistics_never": "No run yet",
+  "_emailsync_result_source_unavailable": "Paused: source login unavailable after MX cutover. Final reconciliation needs review."
 }

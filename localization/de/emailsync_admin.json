@@ -64,7 +64,7 @@
   "_emailsync_reset_cutover_confirm": "Den erkannten MX-Wechsel und die laufende Nachlaufzeit wirklich zurücksetzen?",
   "_emailsync_report_subject": "Postfach-Synchronisierung",
   "_emailsync_event_initial_complete": "Die Erstsynchronisierung für %domain% wurde am %date% abgeschlossen. Das Postfach wird jetzt bis zum erkannten MX-Wechsel und durch die anschließende Nachlaufzeit weiter überwacht.",
-  "_emailsync_event_completed": "Die Synchronisierung für %domain% wurde am %date% abgeschlossen. TTL-, Mindestüberwachungs- und Ruhezeit sind erfüllt; die gespeicherten Postfach-Passwörter wurden gelöscht.",
+  "_emailsync_event_completed": "Die Synchronisierung für %domain% wurde am %date% abgeschlossen. TTL-, Mindestüberwachungs- und Ruhezeit sind erfüllt. Gespeicherte Zugänge bleiben verfügbar.",
   "_emailsync_event_failed": "Die Synchronisierung für %domain% ist am %date% fehlgeschlagen und wird beim nächsten fälligen Cron erneut versucht.",
   "_emailsync_run_summary": "Stand der Synchronisierung",
   "_emailsync_statistics_jobs": "Jobs",
@@ -89,5 +89,6 @@
   "_emailsync_statistics_errors": "Fehler",
   "_emailsync_statistics_bytes_transferred": "Daten",
   "_emailsync_statistics_last_run": "Letzter Lauf",
-  "_emailsync_statistics_never": "Noch kein Lauf"
+  "_emailsync_statistics_never": "Noch kein Lauf",
+  "_emailsync_result_source_unavailable": "Pausiert: Quelle nach MX-Wechsel nicht mehr zugänglich. Schlussabgleich muss geprüft werden."
 }

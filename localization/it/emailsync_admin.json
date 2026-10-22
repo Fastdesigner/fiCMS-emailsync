@@ -64,7 +64,7 @@
   "_emailsync_reset_cutover_confirm": "Reimpostare il cambio MX rilevato e il periodo di sicurezza attivo?",
   "_emailsync_report_subject": "Sincronizzazione caselle email",
   "_emailsync_event_initial_complete": "La sincronizzazione iniziale di %domain% è terminata il %date%. La casella resterà monitorata fino al cambio MX e al successivo periodo di sicurezza.",
-  "_emailsync_event_completed": "La sincronizzazione di %domain% è terminata il %date%. I periodi TTL, di monitoraggio e di inattività sono trascorsi; le password salvate sono state eliminate.",
+  "_emailsync_event_completed": "La sincronizzazione per %domain% è stata completata il %date%. I periodi TTL, di monitoraggio minimo e di inattività sono trascorsi. Gli accessi salvati restano disponibili.",
   "_emailsync_event_failed": "La sincronizzazione di %domain% non è riuscita il %date% e verrà riprovata alla prossima esecuzione cron prevista.",
   "_emailsync_run_summary": "Stato della sincronizzazione",
   "_emailsync_statistics_jobs": "Job",
@@ -89,5 +89,6 @@
   "_emailsync_statistics_errors": "Errori",
   "_emailsync_statistics_bytes_transferred": "Dati",
   "_emailsync_statistics_last_run": "Ultima esecuzione",
-  "_emailsync_statistics_never": "Nessuna esecuzione"
+  "_emailsync_statistics_never": "Nessuna esecuzione",
+  "_emailsync_result_source_unavailable": "In pausa: accesso alla sorgente non disponibile dopo il cambio MX. Verificare il controllo finale."
 }

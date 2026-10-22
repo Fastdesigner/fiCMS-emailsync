@@ -17,6 +17,8 @@
     "imap\\ConnectionStore::purgeSecret",
     "ficms\\Runtime::check",
     "ficms\\Runtime::load",
-    "ficms\\Runtime::loadCheck"
+    "ficms\\Runtime::loadCheck",
+    "ficms\\Runtime::grant",
+    "ficms\\Runtime::request"
   ]
 }

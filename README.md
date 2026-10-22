@@ -1,6 +1,6 @@
 # fiCMS Email Sync
 
-`fiCMS-emailsync` ist ein eigenständiges fiCMS-Add-on für wiederholbare, einseitige IMAP-Postfachmigrationen. Der fiCMS-Cron ist der Worker: Pro Cron-Lauf wird höchstens ein fälliger Sync-Job vollständig ausgeführt, auch wenn dieser mehrere Stunden dauert.
+`fiCMS-emailsync` ist ein eigenständiges fiCMS-Add-on für wiederholbare, einseitige IMAP-Postfachmigrationen. Der reguläre fiCMS-Cron ist der Worker und hält dessen vorhandenen Prozesslock. Pro Aufruf bearbeitet das Plugin einen fälligen Auftrag in einer Kopierscheibe von bis zu acht Sekunden, begrenzt zusätzlich durch das verbleibende Core-Requestbudget. Es gibt keine zusätzliche globale 20-Minuten-Sperre. Teilläufe sind beim nächsten regulären Cron sofort wieder fällig; `Runtime::request` meldet offene Erstübernahmen an die vorhandene Backlogsteuerung.
 
 ## Voraussetzungen
 
@@ -135,3 +135,15 @@ Verkettung oder Trace-Argumente und stellt den vorherigen Handler im `finally` w
 Auch nach einer Exception beim Jobschreiben läuft der Cleanup; er entfernt ausschließlich
 neu angelegte, von keinem Job referenzierte Verbindungen. Das garantiert keine
 crashsichere Transaktion bei Prozessabbruch oder eine Bereinigung trotz anhaltender I/O-Fehler.
+
+## Priorisierung und Abschluss
+
+Erstübernahmen und unvollständige Teilläufe werden vor Monitoring-Aufträgen ausgewählt und untereinander nach dem ältesten Lauf rotiert. Monitoring läuft höchstens stündlich; nach sechs Stunden ohne Prüfung bekommt ein fälliger Monitoring-Auftrag einen fairen Vorrang. Die tatsächliche Startfrequenz bleibt vom regulären Hoster-/fiCMS-Cron abhängig.
+
+Automatisch als Zielwechsel erkannt werden ausschließlich vollständige MX-Ziele, die dem gespeicherten Zielserver entsprechen. Unterschiedliche IMAP-/MX-Hostnamen werden über die vorhandene manuelle Bestätigung derselben beobachteten MX-Konfiguration bestätigt. Rückwechsel oder andere MX-Ziele verwerfen die alte Wechselbestätigung; DNS-Ausfälle erlauben keinen Abschluss. Eine bestehende Wechselzeit wird nur bei derselben zuvor beobachteten Konfiguration übernommen.
+
+Abschluss verlangt vollständige Erstübernahme, passende aktuelle MX und einen erfolgreichen vollständigen leeren Schlussabgleich **nach** Ablauf von TTL, Mindestüberwachung und Ruhezeit. Ein solcher bereits gespeicherter Nachweis kann vor dem nächsten Quellenlogin ausgewertet werden. Abgeschlossene Aufträge werden deaktiviert und nicht erneut verbunden; gespeicherte Zugänge bleiben für den Benutzer erhalten. Löschen eines Auftrags verwendet weiterhin die vorhandene referenzgeprüfte Verbindungsbereinigung.
+
+Wird nach vollständiger Erstübernahme und erkanntem Ziel-MX die Quellanmeldung ausdrücklich abgewiesen, pausiert der Auftrag als `source_unavailable` mit `review_reason`, ohne erneute Fehlermail und ohne falschen Erfolgsabschluss. Zielprobleme, Transportfehler, unvollständige Kopien und fehlender Zielwechsel bleiben normale Fehler mit Wiederholung.
+
+Regressionen: `php dev/tests/scheduling.php` prüft Auswahl, Backlog, MX und Abschlussübergänge ohne Netzwerk; `php dev/tests/transfer-budget.php` führt den echten Transferloop mit synthetischen IMAP-Clients und deterministischer Uhr aus. Bestehende Credential-CAS-, Konkurrenz- und Fehlerprüfungen bleiben unverändert.

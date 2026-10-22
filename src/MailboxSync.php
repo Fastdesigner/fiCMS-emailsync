@@ -6,7 +6,7 @@ use RuntimeException;
 use Throwable;
 
 final class MailboxSync {
-	private const SLICE_SECONDS = 5;
+	private const SLICE_SECONDS = 8;
 
 	public static function probe(): array {
 		$available = class_exists(\imap\Client::class) && \imap\Client::available() && function_exists('sodium_crypto_secretbox');
@@ -50,6 +50,7 @@ final class MailboxSync {
 			'success'=>false,
 			'exit_code'=>1,
 			'error'=>'',
+			'error_side'=>'',
 			'started'=>$started,
 			'finished'=>0,
 			'duration'=>0,
@@ -63,7 +64,11 @@ final class MailboxSync {
 			if ($id === '') throw new RuntimeException('job_invalid');
 			ProgressStore::start($id);
 			$clients = [new \imap\Client($source),new \imap\Client($destination)];
-			foreach ($clients as $client) $client->connect();
+			foreach ($clients as $side => $client) {
+				$result['error_side'] = $side === 0 ? 'source' : 'destination';
+				$client->connect();
+			}
+			$result['error_side'] = '';
 			$result['partial'] = self::transfer($id,$clients[0],$clients[1],$result['stats']) ? 0 : 1;
 			$result['success'] = true;
 			$result['exit_code'] = 0;
@@ -134,7 +139,7 @@ final class MailboxSync {
 			}
 
 			foreach ($uids as $uid) {
-				if ($sliceProcessed > 0 && !\ficms\Runtime::loadCheck('emailsync_transfer',self::SLICE_SECONDS)) return false;
+				if ($sliceProcessed > 0 && (!\ficms\Runtime::loadCheck('emailsync_transfer',self::SLICE_SECONDS) || !\ficms\Runtime::grant(1))) return false;
 				$stats['messages_discovered']++;
 				$message = $source->fetch($uid);
 				try {

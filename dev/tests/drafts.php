@@ -8,6 +8,7 @@ namespace emailsync {
  final class DnsMonitor {
   public static $onSnapshot=null;
   public static function cutover(array $baseline,array $current):bool{return false;}
+  public static function observe(array $job,array $current,string $host):array{$job['current_mx']=$current;return $job;}
   public static function sourceDomain(string $name):string{return filter_var($name,FILTER_VALIDATE_EMAIL)?substr($name,strrpos($name,'@')+1):'';}
   public static function snapshot(string $name):array{if(self::$onSnapshot){$callback=self::$onSnapshot;self::$onSnapshot=null;$callback();}return ['fingerprint'=>$name];}
  }

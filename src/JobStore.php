@@ -94,11 +94,18 @@ final class JobStore {
 
 	public static function due(int $now = 0): array {
 		$now = $now > 0 ? $now : (int) ($_SERVER['now'] ?? time());
+		$due = [];
 		foreach (self::list() as $job) {
 			if ((int) ($job['active'] ?? 0) !== 1 || in_array(($job['phase'] ?? ''),['draft','completed'],true)) continue;
 			if ((int) ($job['next_run'] ?? 0) > $now) continue;
-			return $job;
+			$due[] = $job;
 		}
+		// Initial copies lead; a monitoring job not checked for six hours gets one fair turn.
+		usort($due,static function(array $a, array $b) use ($now): int {
+			$rank = static fn(array $j): int => ($j['phase'] ?? '') === 'initial' || ($j['last_result'] ?? '') === 'partial' ? 0 : (((int) ($j['last_run'] ?? 0) <= $now - 21600) ? -1 : 1);
+			return [$rank($a),(int) ($a['last_run'] ?? 0),(int) ($a['created'] ?? 0)] <=> [$rank($b),(int) ($b['last_run'] ?? 0),(int) ($b['created'] ?? 0)];
+		});
+		if ($due) return $due[0];
 		return [];
 	}
 

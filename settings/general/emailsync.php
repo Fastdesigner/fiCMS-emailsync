@@ -41,13 +41,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 
 	if (!isset($_POST['handled']) && in_array($emailsync['action'],['cutover','reset_cutover'],true) && $emailsync['id'] !== '') {
 		$emailsync['job'] = \emailsync\JobStore::update($emailsync['id'],function(array $job) use ($emailsync): array {
-			if ($emailsync['action'] == 'cutover' && ($job['phase'] ?? '') === 'monitoring') $job['cutover_detected'] = (int) ($_SERVER['now'] ?? time());
-			if ($emailsync['action'] == 'reset_cutover' && ($job['phase'] ?? '') === 'monitoring') {
-				$job['cutover_detected'] = 0;
-				$job['baseline_mx'] = \emailsync\DnsMonitor::snapshot((string) ($job['domain'] ?? ''));
-				$job['current_mx'] = $job['baseline_mx'];
-			}
-			return $job;
+			return \emailsync\DnsMonitor::confirm($job,$emailsync['action'] === 'reset_cutover');
 		});
 		$emailsync['output']['result'] = ['result'=>!empty($emailsync['job'])];
 		$_POST['handled'] = true;
