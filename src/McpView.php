@@ -39,6 +39,7 @@ final class McpView {
 	private static function job(array $job, bool $details): array {
 		$view = [
 			'id'=>(string) ($job['id'] ?? ''),
+			'worker_version'=>Runner::POLICY_VERSION,
 			'name'=>(string) ($job['name'] ?? ''),
 			'domain'=>(string) ($job['domain'] ?? ''),
 			'phase'=>(string) ($job['phase'] ?? ''),

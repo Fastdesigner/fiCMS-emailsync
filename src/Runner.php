@@ -3,6 +3,7 @@
 namespace emailsync;
 
 final class Runner {
+	public const POLICY_VERSION = '2026-10-22';
 	public static function runDue(): array {
 		$job = JobStore::due(time());
 		try {
