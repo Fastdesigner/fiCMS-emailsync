@@ -19,6 +19,7 @@
     "ficms\\Runtime::load",
     "ficms\\Runtime::loadCheck",
     "ficms\\Runtime::grant",
-    "ficms\\Runtime::request"
+    "ficms\\Runtime::request",
+    "reports\\Reports::metrics"
   ]
 }

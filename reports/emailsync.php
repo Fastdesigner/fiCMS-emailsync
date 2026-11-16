@@ -60,7 +60,7 @@ foreach ($reports['recipients'] as $reports['emailsync_email'] => $reports['emai
 			'color'=>'',
 			'labelkey'=>'_emailsync_statistics_messages_processed',
 			'delta'=>'',
-			'metric'=>reports__metrics([
+			'metric'=>\reports\Reports::metrics([
 				['key'=>'messages_total','label'=>'_emailsync_statistics_messages_total','value'=>(int) ($reports['emailsync_progress']['total'] ?? 0)],
 				['key'=>'messages_processed','label'=>'_emailsync_statistics_messages_processed','value'=>(int) ($reports['emailsync_progress']['processed'] ?? 0)],
 				['key'=>'messages_pending','label'=>'_emailsync_statistics_messages_pending','value'=>(int) ($reports['emailsync_progress']['pending'] ?? 0)]
