@@ -19,7 +19,7 @@ final class JobConfiguration {
 		$identityChanged = false;
 		foreach (['host','port','security','username'] as $field) if ((string) ($stored[$field] ?? '') !== (string) $connection[$field]) $identityChanged = true;
 		if ($identityChanged && $connection['password'] !== '' && hash_equals((string) (\imap\ConnectionStore::credentials((string) ($stored['id'] ?? ''))['password'] ?? ''),$connection['password'])) return ['result'=>false,'error'=>'imap_credentials_missing'];
-		if ($connection['password'] === '') {
+		if ($connection['password'] === '' && !array_key_exists($side.'_password',$data)) {
 			foreach (['host','port','security','username'] as $field) if ((string) ($stored[$field] ?? '') !== (string) $connection[$field]) return ['result'=>false,'error'=>'imap_credentials_missing'];
 			$connection['password'] = (string) (\imap\ConnectionStore::credentials((string) ($stored['id'] ?? ''))['password'] ?? '');
 		}
@@ -102,10 +102,10 @@ final class JobConfiguration {
 			foreach (['host','port','security','username'] as $field) if ((string) ($stored[$field] ?? '') !== (string) $connection[$field]) $identityChanged = true;
 			if ($identityChanged && (int) ($current['run_count'] ?? 0) > 0) return ['result'=>false,'error'=>'mailbox_identity_locked'];
 			$password = (string) ($data[$side.'_password'] ?? '');
-			// A revealed value resubmitted unchanged is never a new credential, even after editing the server.
-			if ($password !== '' && hash_equals((string) (\imap\ConnectionStore::credentials((string) ($stored['id'] ?? ''))['password'] ?? ''),$password)) $password = '';
-			if ($identityChanged || $password !== '') $connection['id'] = '';
-			$changed = $changed || $identityChanged || $password !== '';
+			$credentialChanged = array_key_exists($side.'_password',$data) && !hash_equals((string) (\imap\ConnectionStore::credentials((string) ($stored['id'] ?? ''))['password'] ?? ''),$password);
+			if ($identityChanged && !$credentialChanged) $password = '';
+			if ($identityChanged || $credentialChanged) $connection['id'] = '';
+			$changed = $changed || $identityChanged || $credentialChanged;
 			$connections[$side] = ['metadata'=>$connection,'password'=>$password,'stored'=>$stored];
 		}
 		$domain = DnsMonitor::sourceDomain($connections['source']['metadata']['username']);

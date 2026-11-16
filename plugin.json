@@ -20,6 +20,8 @@
     "ficms\\Runtime::loadCheck",
     "ficms\\Runtime::grant",
     "ficms\\Runtime::request",
-    "reports\\Reports::metrics"
-  ]
+    "reports\\Reports::metrics",
+    "ficms\\Settings::revealSecrets"
+  ],
+  "version": "0.1.1"
 }

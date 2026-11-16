@@ -54,13 +54,10 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 
 	if (!isset($_POST['handled']) && $emailsync['action'] == 'load') {
 		$emailsync['job'] = $emailsync['id'] !== '' && $emailsync['id'] !== 'new' ? \emailsync\JobStore::get($emailsync['id']) : [];
-		$emailsync['source'] = !empty($emailsync['job']['source_id']) ? \imap\ConnectionStore::get((string) $emailsync['job']['source_id']) : [];
-		$emailsync['destination'] = !empty($emailsync['job']['destination_id']) ? \imap\ConnectionStore::get((string) $emailsync['job']['destination_id']) : [];
-		// Gespeicherte Passwörter sieht nur der Supervisor in diesem Formular (Schutz am Dateianfang); MCP und Protokolle bleiben redigiert.
-		$emailsync['credentials'] = [
-			'source'=>!empty($emailsync['source']['has_secret']) ? \imap\ConnectionStore::credentials((string) $emailsync['job']['source_id']) : [],
-			'destination'=>!empty($emailsync['destination']['has_secret']) ? \imap\ConnectionStore::credentials((string) $emailsync['job']['destination_id']) : []
-		];
+		foreach (['source','destination'] as $emailsync['side']) {
+			$emailsync[$emailsync['side']] = !empty($emailsync['job'][$emailsync['side'].'_id']) ? \imap\ConnectionStore::get((string) $emailsync['job'][$emailsync['side'].'_id']) : [];
+			$emailsync['credentials'][$emailsync['side']] = \ficms\Settings::revealSecrets() && !empty($emailsync[$emailsync['side']]['has_secret']) ? \imap\ConnectionStore::credentials((string) $emailsync['job'][$emailsync['side'].'_id']) : [];
+		}
 		$emailsync['data'] = [
 			'name'=>$emailsync['job']['name'] ?? '',
 			'report_email'=>$emailsync['job']['report_email'] ?? ($user['email'] ?? ''),
@@ -107,7 +104,7 @@ if (isset($_POST['settings'],$_POST['type'],$_POST['action']) && $_POST['type'] 
 			$emailsync['connection']->field($emailsync['side'].'_port','number',$emailsync['data'][$emailsync['side'].'_port'],['call'=>false,'attrs'=>['required'=>'required','min'=>1,'max'=>65535]]);
 			$emailsync['connection']->field($emailsync['side'].'_security','select',$emailsync['data'][$emailsync['side'].'_security'],['call'=>false,'options'=>['ssl'=>'IMAPS (SSL/TLS)','tls'=>'IMAP + STARTTLS']]);
 			$emailsync['connection']->field($emailsync['side'].'_username','input',$emailsync['data'][$emailsync['side'].'_username'],['call'=>false,'attrs'=>$emailsync['side'] === 'source' ? ['required'=>'required','inputmode'=>'email'] : []]);
-			$emailsync['connection']->field($emailsync['side'].'_password','password',$emailsync['data'][$emailsync['side'].'_password'],['call'=>false,'attrs'=>$emailsync['has_secret'] && $emailsync['data'][$emailsync['side'].'_password'] === '' ? ['autocomplete'=>'new-password','placeholder'=>language__get($user['language'],'_emailsync_password_keep')] : ['autocomplete'=>'new-password']]);
+			$emailsync['connection']->field($emailsync['side'].'_password','password',$emailsync['data'][$emailsync['side'].'_password'],['call'=>false,'attrs'=>['autocomplete'=>'new-password']]);
 			$emailsync['connection']->text($emailsync['side'].'-status',$emailsync['state_text'],['attrs'=>['data-emailsync-connection-status'=>$emailsync['side'],'data-notify'=>$emailsync['state']]]);
 		}
 

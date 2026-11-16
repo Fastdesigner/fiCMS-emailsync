@@ -3,7 +3,7 @@
 if (!$site['onsite']) return false;
 
 if ($context->mode === 'describe') return [
-	'purpose'=>'Edits an existing email-sync configuration or controls its runtime after get with view edit. Configuration changes never start a transfer; changed connections pause the job. Stored passwords are retained when omitted or blank, and never returned.',
+	'purpose'=>'Edits an existing email-sync configuration or controls its runtime after get with view edit. Configuration changes never start a transfer; changed connections pause the job. Stored passwords are retained when omitted, and never returned.',
 	'args'=>['id'=>'Email-sync job id, or "settings".','data'=>'Job configuration: any subset of name, report_email, source_host/port/security/username/password and destination_host/port/security/username/password. Separately, one runtime command: active (0 or 1), run_next_cron (true), cutover (confirm or reset), or test_connection (source or destination; tests only the stored connection, never copies mail). Do not mix configuration and commands. Protected credential write: exactly one nonempty source_password or destination_password, expected_configuration_revision (get.job.configuration_revision), expected_identity with source and destination, each exactly id, host, port (integer), security, username from get.job.source/destination. Both assertions are required if either is present; no other fields. Checked atomically before secret persistence; success returns only result/type/id/status submitted, errors are target_changed, invalid_protected_credential_write or credential_write_failed. For settings: interval_minutes, quiet_hours, monitoring_days, fallback_ttl_hours.'],
 	'scope'=>['admin']
 ];
