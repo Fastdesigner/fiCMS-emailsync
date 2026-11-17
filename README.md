@@ -26,7 +26,7 @@ Für eine lokale Entwicklungsinstallation kann dieses Repository direkt nach `sy
 
 Der erste erfolgreiche Lauf überführt den Job von `initial` nach `monitoring` und erzeugt einen Ereignisreport. Weitere Läufe übertragen nur noch fehlende Nachrichten. Ein erkannter MX-Wechsel startet den Nachlauf. Abgeschlossen wird erst, wenn mindestens ein vollständiges TTL-Fenster vergangen ist, danach 48 Stunden keine neue Quellnachricht übertragen wurde, der Mindestnachlauf erfüllt ist und ein erfolgreicher Lauf null neue Nachrichten meldet.
 
-Beim Abschluss werden beide für die Migration gespeicherten Passwörter entfernt und ein Abschlussreport erzeugt. Der Report wird beim folgenden Cron-Lauf verschickt, da das Report-System in der Cron-Pipeline vor dem Plugin-Worker läuft.
+Beim Abschluss bleiben gespeicherte Verbindungen erhalten und ein Abschlussreport wird erzeugt. Der Report wird beim folgenden Cron-Lauf verschickt, da das Report-System in der Cron-Pipeline vor dem Plugin-Worker läuft.
 
 ## Sicherheit und Transferverhalten
 
@@ -144,6 +144,8 @@ Automatisch als Zielwechsel erkannt werden ausschließlich vollständige MX-Ziel
 
 Abschluss verlangt vollständige Erstübernahme, passende aktuelle MX und einen erfolgreichen vollständigen leeren Schlussabgleich **nach** Ablauf von TTL, Mindestüberwachung und Ruhezeit. Ein solcher bereits gespeicherter Nachweis kann vor dem nächsten Quellenlogin ausgewertet werden. Abgeschlossene Aufträge werden deaktiviert und nicht erneut verbunden; gespeicherte Zugänge bleiben für den Benutzer erhalten. Löschen eines Auftrags verwendet weiterhin die vorhandene referenzgeprüfte Verbindungsbereinigung.
 
-Wird nach vollständiger Erstübernahme und erkanntem Ziel-MX die Quellanmeldung ausdrücklich abgewiesen, pausiert der Auftrag als `source_unavailable` mit `review_reason`, ohne erneute Fehlermail und ohne falschen Erfolgsabschluss. Zielprobleme, Transportfehler, unvollständige Kopien und fehlender Zielwechsel bleiben normale Fehler mit Wiederholung.
+Wird nach vollständiger Erstübernahme und verifiziertem Ziel-MX die Quellanmeldung ausdrücklich abgewiesen und sind keine Nachrichten mehr ausstehend, schließt der Auftrag regulär ab. TTL-, Mindestüberwachungs- und Ruhezeit gelten für weiter erreichbare Quellen; ohne Quellzugang ist kein weiterer Abgleich möglich. Alte `source_unavailable`-Prüfzustände werden beim Cron nur für `source_login_unavailable_after_cutover`, null ausstehende Nachrichten und frisch bestätigten identischen Ziel-MX über denselben Abschlussweg finalisiert. Manuelle Pausen bleiben erhalten. Zielprobleme, Transportfehler, unvollständige Kopien und fehlender Zielwechsel bleiben normale Fehler mit Wiederholung.
 
 Regressionen: `php dev/tests/scheduling.php` prüft Auswahl, Backlog, MX und Abschlussübergänge ohne Netzwerk; `php dev/tests/transfer-budget.php` führt den echten Transferloop mit synthetischen IMAP-Clients und deterministischer Uhr aus. Bestehende Credential-CAS-, Konkurrenz- und Fehlerprüfungen bleiben unverändert.
+
+`get(type:"emailsync",id:"reports")` liest Event-Quittungen und den effektiven Report-Abostatus der konfigurierten Empfänger. Das Report-Plugin quittiert Events erst über den Zustellcallback von `reports\Reports` bei `sent` oder dauerhafter Übergabe `queued`; Erzeugen des Inhalts, Fehler und unklare Zustellung quittieren nichts. Ein gesetztes `report_email` ist der ausschließliche Empfänger.

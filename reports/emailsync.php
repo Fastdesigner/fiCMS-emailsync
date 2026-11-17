@@ -3,7 +3,9 @@
 if (!$site['onsite']) return;
 
 if ($reports['mode'] == 'meta') {
-	$reports['meta'] = ['active'=>1,'selfsend'=>0,'subject'=>'_emailsync_report_subject','schedule'=>['mode'=>'event']];
+	$reports['meta'] = ['active'=>1,'selfsend'=>0,'subject'=>'_emailsync_report_subject','schedule'=>['mode'=>'event'],'complete'=>static function(array $item, array $user, string $state): void {
+		if (in_array($state,['sent','queued'],true)) \emailsync\JobStore::markEventsNotified($item['emailsync_event_ids'] ?? []);
+	}];
 	return;
 }
 
@@ -20,7 +22,7 @@ if ($reports['mode'] == 'recipients') {
 	$reports['emailsync_recipients'] = [];
 	foreach ($reports['recipients'] as $reports['emailsync_email'] => $reports['emailsync_recipient']) {
 		foreach ($reports['emailsync_events'] as $reports['emailsync_event']) {
-			if ((int) ($reports['emailsync_event']['report_user_id'] ?? 0) !== (int) ($reports['emailsync_recipient']['user']['id'] ?? 0) && strcasecmp((string) ($reports['emailsync_event']['report_email'] ?? ''),(string) $reports['emailsync_email']) !== 0) continue;
+			if (!\emailsync\JobStore::eventRecipient($reports['emailsync_event'],(string) $reports['emailsync_email'],(int) ($reports['emailsync_recipient']['user']['id'] ?? 0))) continue;
 			$reports['emailsync_recipients'][$reports['emailsync_email']] = $reports['emailsync_recipient'];
 			break;
 		}
@@ -34,9 +36,10 @@ if ($reports['mode'] != 'send') return;
 $reports['emailsync_sent'] = [];
 foreach ($reports['recipients'] as $reports['emailsync_email'] => $reports['emailsync_recipient']) {
 	$reports['emailsync_list'] = [];
+	$reports['emailsync_sent'] = [];
 	$reports['emailsync_language'] = (string) (($reports['emailsync_recipient']['user']['language'] ?? '') ?: $site['default_language']);
 	foreach ($reports['emailsync_events'] as $reports['emailsync_event']) {
-		if ((int) ($reports['emailsync_event']['report_user_id'] ?? 0) !== (int) ($reports['emailsync_recipient']['user']['id'] ?? 0) && strcasecmp((string) ($reports['emailsync_event']['report_email'] ?? ''),(string) $reports['emailsync_email']) !== 0) continue;
+		if (!\emailsync\JobStore::eventRecipient($reports['emailsync_event'],(string) $reports['emailsync_email'],(int) ($reports['emailsync_recipient']['user']['id'] ?? 0))) continue;
 		$reports['emailsync_summary'] = (array) ($reports['emailsync_event']['summary'] ?? []);
 		$reports['emailsync_progress'] = (array) ($reports['emailsync_summary']['progress'] ?? []);
 		if (!$reports['emailsync_progress'] && !empty($reports['emailsync_event']['job_id'])) $reports['emailsync_progress'] = \emailsync\ProgressStore::summary(\emailsync\JobStore::get((string) $reports['emailsync_event']['job_id']));
@@ -69,8 +72,6 @@ foreach ($reports['recipients'] as $reports['emailsync_email'] => $reports['emai
 		$reports['emailsync_sent'][$reports['emailsync_event']['id']] = true;
 	}
 	if (!$reports['emailsync_list']) continue;
-	$reports['items'][$reports['emailsync_email']] = ['list'=>$reports['emailsync_list']];
+	$reports['items'][$reports['emailsync_email']] = ['list'=>$reports['emailsync_list'],'emailsync_event_ids'=>array_keys($reports['emailsync_sent'])];
 	$reports['has_values'] = 1;
 }
-
-if ($reports['emailsync_sent'] && empty($reports['selfsend'])) \emailsync\JobStore::markEventsNotified(array_keys($reports['emailsync_sent']));

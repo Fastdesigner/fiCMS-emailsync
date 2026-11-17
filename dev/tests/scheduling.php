@@ -63,15 +63,26 @@ namespace {
  check(\imap\ConnectionStore::$purges===0,'completion retains user-visible saved connections');
  check(count(\emailsync\State::read('events.json'))===1,'completion creates exactly one existing event');
  check(\emailsync\Runner::run('x')['status']==='not_runnable','completed job cannot run or emit a second event');
- // P1 regression: an empty sweep before the full deadline never proves final completion.
- $cutover=$now-604900;$deadline=$cutover+604800;
- resetFixture(['x'=>job('x',['cutover_detected'=>$cutover,'last_source_change'=>$cutover,'last_summary'=>['success'=>1,'partial'=>0,'finished'=>$deadline-1,'stats'=>['messages_discovered'=>0]]])]);
- \emailsync\MailboxSync::$result=['success'=>false,'partial'=>0,'error_side'=>'source','error'=>'imap_command_failed_login'];
- $result=\emailsync\Runner::run('x');$stored=\emailsync\JobStore::get('x');
- check(\emailsync\MailboxSync::$calls===1&&$stored['phase']==='monitoring'&&$stored['active']===0&&$stored['last_result']==='source_unavailable','sweep before deadline plus closed source pauses instead of false completion');
- check($stored['last_error']===''&&$stored['review_reason']==='source_login_unavailable_after_cutover','expected source retirement is review state, not repeated generic failure');
- check(!\emailsync\State::read('events.json'),'source retirement does not produce another failed notification');
- check(\emailsync\Runner::run('x')['status']==='not_runnable','retired source is not retried automatically');
+ // Retired sources finish even before the normal monitoring deadline.
+ resetFixture(['x'=>job('x',['cutover_detected'=>$now-100,'last_summary'=>[]])]);
+ \emailsync\MailboxSync::$result=['success'=>false,'error_side'=>'source','error'=>'imap_command_failed_login'];
+ \emailsync\Runner::run('x');$stored=\emailsync\JobStore::get('x');
+ check($stored['phase']==='completed'&&$stored['active']===0,'closed source after cutover completes before minimum monitoring');
+ check(count(\emailsync\State::read('events.json'))===1,'retired source emits one completed event');
+ $paused=job('x',['active'=>0,'last_result'=>'source_unavailable','review_reason'=>'source_login_unavailable_after_cutover']);
+ resetFixture(['x'=>$paused]);\emailsync\Runner::runDue();
+ check(\emailsync\JobStore::get('x')['phase']==='completed'&&\emailsync\MailboxSync::$calls===0&&\imap\ConnectionStore::$reads===0,'cron finalizes paused legacy job without source login');
+ \emailsync\Runner::runDue();check(count(\emailsync\State::read('events.json'))===1,'repeated cron emits no duplicate completed event');
+ foreach(['dns','pending','manual_pause','incomplete'] as $case){
+  $j=$paused;
+  if($case==='dns')$GLOBALS['fixtureMx']=[];
+  if($case==='pending')$j['last_summary']['stats']['messages_source']=101;
+  if($case==='manual_pause')unset($j['review_reason']);
+  if($case==='incomplete')$j['initial_completed']=0;
+  resetFixture(['x'=>$j]);\emailsync\Runner::runDue();
+  check(\emailsync\JobStore::get('x')['phase']==='monitoring'&&!\emailsync\State::read('events.json'),"$case prevents legacy completion");
+  $GLOBALS['fixtureMx']=[['target'=>'mail.target.invalid','pri'=>10,'ttl'=>3600]];
+ }
  foreach(['destination',''] as $side){resetFixture(['x'=>job('x',['last_summary'=>[]])]);\emailsync\MailboxSync::$result=['success'=>false,'error_side'=>$side,'error'=>'imap_command_failed_login'];\emailsync\Runner::run('x');check(\emailsync\JobStore::get('x')['last_result']==='failed'&&\emailsync\JobStore::get('x')['active']===1,'destination or unattributed failure remains a real retryable error');}
  resetFixture(['x'=>job('x',['initial_completed'=>0,'phase'=>'initial','last_summary'=>[]])]);\emailsync\MailboxSync::$result=['success'=>false,'error_side'=>'source','error'=>'imap_command_failed_login'];\emailsync\Runner::run('x');check(\emailsync\JobStore::get('x')['last_result']==='failed','incomplete initial copy cannot be retired');
  resetFixture(['x'=>job('x',['last_summary'=>[]])]);\emailsync\MailboxSync::$result=['success'=>false,'error_side'=>'source','error'=>'imap_timeout'];\emailsync\Runner::run('x');check(\emailsync\JobStore::get('x')['last_result']==='failed','transient timeout is not treated as deleted source');

@@ -151,6 +151,11 @@ final class JobStore {
 		return $event;
 	}
 
+	public static function eventRecipient(array $event, string $email, int $userId): bool {
+		if (!empty($event['report_email'])) return strcasecmp($event['report_email'],$email) === 0;
+		return $userId > 0 && (int) ($event['report_user_id'] ?? 0) === $userId;
+	}
+
 	public static function pendingEvents(): array {
 		$events = State::read(self::EVENTS_FILE);
 		foreach ($events as $id => $event) if (!is_array($event) || (int) ($event['notified'] ?? 0) !== 0) unset($events[$id]);

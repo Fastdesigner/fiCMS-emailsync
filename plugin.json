@@ -21,7 +21,8 @@
     "ficms\\Runtime::grant",
     "ficms\\Runtime::request",
     "reports\\Reports::metrics",
+    "reports\\Reports::claimItem",
     "ficms\\Settings::revealSecrets"
   ],
-  "version": "0.1.1"
+  "version": "0.1.2"
 }

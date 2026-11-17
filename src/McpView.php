@@ -12,6 +12,20 @@ final class McpView {
 			'statistics'=>JobStore::statistics(),
 			'jobs'=>array_values(array_map(fn(array $job): array => self::job($job,false),JobStore::list()))
 		];
+		if ($id === 'reports') {
+			global $tables;
+			$events = State::read('events.json');
+			$recipients = [];
+			foreach (JobStore::list() as $job) {
+				$email = (string) ($job['report_email'] ?? '');
+				if ($email === '' || isset($recipients[$email])) continue;
+				$user = mysqlFetchAssoc("SELECT `id`,`email`,`ac`,`reports` FROM ".$tables['user']." WHERE `email` = '".mysqlEscape($email)."' LIMIT 1");
+				$entries = $user ? helper__json_convert($user['reports'] ?? []) : [];
+				$entry = $user ? \reports\Reports::entry('emailsync',\reports\Reports::metaMap()['emailsync'] ?? [],$user,$entries['emailsync'] ?? []) : [];
+				$recipients[$email] = ['user_id'=>(int) ($user['id'] ?? 0),'user_active'=>(int) ($user['ac'] ?? 0),'report_active'=>(int) ($entry['active'] ?? 0),'last_report'=>(int) ($entry['last'] ?? 0)];
+			}
+			return ['type'=>'emailsync','events'=>array_values(array_map(static fn(array $event): array => array_intersect_key($event,array_flip(['id','job_id','type','report_email','created','notified'])),$events)),'recipients'=>$recipients];
+		}
 		if ($id === 'settings') {
 			$result = ['type'=>'emailsync','id'=>'settings','settings'=>Settings::get()];
 			if ($edit) foreach (['interval_minutes'=>['interval',60],'quiet_hours'=>['quiet_period',3600],'monitoring_days'=>['minimum_monitoring',86400],'fallback_ttl_hours'=>['fallback_ttl',3600]] as $field => $mapping) $result['edit'][$field] = $result['settings'][$mapping[0]] / $mapping[1];

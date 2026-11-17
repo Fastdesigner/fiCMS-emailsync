@@ -3,10 +3,16 @@
 namespace emailsync;
 
 final class Runner {
-	public const POLICY_VERSION = '2026-10-22';
+	public const POLICY_VERSION = '2026-11-17';
 	public static function runDue(): array {
-		$job = JobStore::due(time());
 		try {
+			foreach (JobStore::list() as $stored) {
+				if (!self::retiredPause($stored)) continue;
+				if (!\ficms\Runtime::grant(2)) return ['success'=>true,'status'=>'deferred'];
+				$result = self::run((string) $stored['id']);
+				if (($result['status'] ?? '') === 'completed') return $result;
+			}
+			$job = JobStore::due(time());
 			if (!$job) return ['success'=>true,'status'=>'idle'];
 			if (!\ficms\Runtime::grant(2)) return ['success'=>true,'status'=>'deferred'];
 			return self::run((string) $job['id']);
@@ -19,6 +25,12 @@ final class Runner {
 
 	public static function run(string $id): array {
 		$job = JobStore::get($id);
+		if (self::retiredPause($job)) {
+			$current = DnsMonitor::snapshot((string) ($job['domain'] ?? ''));
+			$verified = array_merge($job,['current_mx'=>$current]);
+			if (!self::retiredSourceComplete($verified)) return ['success'=>true,'status'=>'review_required'];
+			return self::finish($id,$job,time(),['success'=>true,'status'=>'completed','completion_reason'=>'source_login_unavailable_after_cutover']);
+		}
 		if (!$job || (int) ($job['active'] ?? 0) !== 1 || in_array(($job['phase'] ?? ''),['draft','completed'],true)) return ['success'=>false,'status'=>'not_runnable'];
 		$job = Settings::apply($job);
 
@@ -43,20 +55,8 @@ final class Runner {
 		$result['synchronized_total'] = max(0,(int) (ProgressStore::get($id)['run']['processed'] ?? 0));
 		Statistics::add($id,$result);
 
-		if (empty($result['success']) && ($result['error_side'] ?? '') === 'source' && ($result['error'] ?? '') === 'imap_command_failed_login' && !empty($job['initial_completed']) && !empty($job['cutover_detected']) && !empty($job['current_mx']['fingerprint']) && $job['current_mx']['fingerprint'] === ($job['cutover_fingerprint'] ?? '')) {
-			$summary = ProgressStore::summary($job);
-			if ((int) ($summary['pending'] ?? 1) === 0) {
-				$paused = self::updateRun($id,$job,function(array $stored) use ($finished): array {
-					$stored['active'] = 0;
-					$stored['next_run'] = 0;
-					$stored['last_result'] = 'source_unavailable';
-					$stored['last_error'] = '';
-					$stored['review_reason'] = 'source_login_unavailable_after_cutover';
-					$stored['review_at'] = $finished;
-					return $stored;
-				});
-				return ['success'=>true,'status'=>$paused ? 'source_unavailable' : 'configuration_changed','job'=>$paused];
-			}
+		if (empty($result['success']) && ($result['error_side'] ?? '') === 'source' && ($result['error'] ?? '') === 'imap_command_failed_login' && self::retiredSourceComplete($job)) {
+			return self::finish($id,$job,$finished,['success'=>true,'status'=>'completed','completion_reason'=>'source_login_unavailable_after_cutover']);
 		}
 		if (empty($result['success'])) {
 			$firstFailure = (int) ($job['failure_count'] ?? 0) === 0;
@@ -117,8 +117,10 @@ final class Runner {
 	}
 
 	private static function finish(string $id, array $job, int $finished, array $result): array {
-		$job = self::updateRun($id,$job,function(array $stored) use ($finished): array {
+		$job = self::updateRun($id,$job,function(array $stored) use ($finished,$result): array {
 			$stored['phase'] = 'completed';
+			$stored['completion_reason'] = (string) ($result['completion_reason'] ?? 'final_sweep');
+			unset($stored['review_reason'],$stored['review_at']);
 			$stored['active'] = 0;
 			$stored['completed'] = $finished;
 			$stored['next_run'] = 0;
@@ -136,11 +138,21 @@ final class Runner {
 		$matched = false;
 		$result = JobStore::update($id,function(array $stored) use ($expected,$update,&$matched): array {
 			foreach (['source_id','destination_id','configuration_revision'] as $field) if (($stored[$field] ?? '') !== ($expected[$field] ?? '')) return $stored;
-			if ((int) ($stored['active'] ?? 0) !== 1 || in_array(($stored['phase'] ?? ''),['draft','completed'],true)) return $stored;
+			if (self::retiredPause($expected)) {
+				if ($stored !== $expected) return $stored;
+			} elseif ((int) ($stored['active'] ?? 0) !== 1 || in_array(($stored['phase'] ?? ''),['draft','completed'],true)) return $stored;
 			$matched = true;
 			return $update($stored);
 		});
 		return $matched ? $result : [];
+	}
+
+	private static function retiredPause(array $job): bool {
+		return (int) ($job['active'] ?? 0) === 0 && ($job['phase'] ?? '') === 'monitoring' && ($job['last_result'] ?? '') === 'source_unavailable' && ($job['review_reason'] ?? '') === 'source_login_unavailable_after_cutover';
+	}
+
+	private static function retiredSourceComplete(array $job): bool {
+		return ($job['phase'] ?? '') === 'monitoring' && !empty($job['initial_completed']) && !empty($job['cutover_detected']) && !empty($job['current_mx']['fingerprint']) && $job['current_mx']['fingerprint'] === ($job['cutover_fingerprint'] ?? '') && ProgressStore::summary($job)['pending'] === 0;
 	}
 
 	private static function complete(array $job, array $result, int $finished): bool {
